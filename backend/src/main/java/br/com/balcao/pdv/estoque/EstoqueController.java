@@ -1,5 +1,7 @@
 package br.com.balcao.pdv.estoque;
 
+import br.com.balcao.pdv.usuario.Papel;
+import br.com.balcao.pdv.usuario.Requer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -34,12 +36,14 @@ public class EstoqueController {
         }
     }
 
+    @Requer(Papel.GERENTE)
     @PostMapping("/entradas")
     @ResponseStatus(HttpStatus.CREATED)
     public MovimentacaoResponse entrada(@PathVariable Long produtoId, @Valid @RequestBody MovimentoRequest req) {
         return MovimentacaoResponse.de(service.entrada(produtoId, req.quantidade(), req.observacao()));
     }
 
+    @Requer(Papel.GERENTE)
     @PostMapping("/ajustes")
     @ResponseStatus(HttpStatus.CREATED)
     public MovimentacaoResponse ajuste(@PathVariable Long produtoId, @Valid @RequestBody MovimentoRequest req) {

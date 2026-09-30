@@ -13,6 +13,7 @@ public record ExtratoCaixa(
         BigDecimal suprimentos,
         BigDecimal sangrias,
         BigDecimal vendasDinheiro,
+        BigDecimal recebimentosClientes,
         BigDecimal estornos,
         BigDecimal saldoEsperado,
         BigDecimal valorContado,

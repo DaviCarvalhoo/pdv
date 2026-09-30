@@ -11,7 +11,10 @@ import java.util.Optional;
 
 public interface VendaRepository extends JpaRepository<Venda, Long>, JpaSpecificationExecutor<Venda> {
 
-    Optional<Venda> findFirstByCaixaIdAndStatusOrderByIdDesc(Long caixaId, StatusVenda status);
+    /** A venda que está na tela (aberta e não estacionada). */
+    Optional<Venda> findFirstByCaixaIdAndStatusAndEmEsperaFalseOrderByIdDesc(Long caixaId, StatusVenda status);
+
+    List<Venda> findByCaixaIdAndStatusAndEmEsperaTrueOrderByIdAsc(Long caixaId, StatusVenda status);
 
     long countByCaixaIdAndStatus(Long caixaId, StatusVenda status);
 

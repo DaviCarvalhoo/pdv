@@ -1,5 +1,8 @@
 package br.com.balcao.pdv.fiscal;
 
+import br.com.balcao.pdv.usuario.Contexto;
+import br.com.balcao.pdv.usuario.Papel;
+import br.com.balcao.pdv.usuario.Requer;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +25,7 @@ public class FiscalController {
 
     private final ConfiguracaoFiscalService configuracaoService;
     private final NfceService nfceService;
+    private final Contexto contexto;
 
     public record CancelamentoRequest(@NotBlank(message = "Informe a justificativa") String justificativa) {
     }
@@ -32,6 +36,7 @@ public class FiscalController {
         return ConfiguracaoFiscalDto.Response.de(c, configuracaoService.pendencias(c));
     }
 
+    @Requer(Papel.ADMIN)
     @PutMapping("/configuracao")
     public ConfiguracaoFiscalDto.Response atualizar(@Valid @RequestBody ConfiguracaoFiscalDto.Request req) {
         ConfiguracaoFiscal c = configuracaoService.atualizar(req);
@@ -77,6 +82,7 @@ public class FiscalController {
 
     @PostMapping("/notas/{id}/cancelar")
     public NotaFiscalResumo cancelar(@PathVariable Long id, @Valid @RequestBody CancelamentoRequest req) {
+        contexto.exigirGerente("Cancelar NFC-e");
         return nfceService.cancelar(id, req.justificativa());
     }
 }

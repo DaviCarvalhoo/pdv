@@ -1,5 +1,7 @@
 package br.com.balcao.pdv.produto;
 
+import br.com.balcao.pdv.usuario.Papel;
+import br.com.balcao.pdv.usuario.Requer;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -54,27 +56,37 @@ public class ProdutoController {
         return Map.of("ativos", service.contarAtivos());
     }
 
+    /** Botões de acesso rápido do PDV. */
+    @GetMapping("/atalhos")
+    public List<ProdutoResponse> atalhos() {
+        return service.atalhos().stream().map(ProdutoResponse::de).toList();
+    }
+
     @GetMapping("/estoque-baixo")
     public List<ProdutoResponse> estoqueBaixo() {
         return service.comEstoqueBaixo().stream().map(ProdutoResponse::de).toList();
     }
 
+    @Requer(Papel.GERENTE)
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public ProdutoResponse cadastrar(@Valid @RequestBody ProdutoRequest req) {
         return ProdutoResponse.de(service.cadastrar(req));
     }
 
+    @Requer(Papel.GERENTE)
     @PutMapping("/{id}")
     public ProdutoResponse atualizar(@PathVariable Long id, @Valid @RequestBody ProdutoRequest req) {
         return ProdutoResponse.de(service.atualizar(id, req));
     }
 
+    @Requer(Papel.GERENTE)
     @PatchMapping("/{id}/desativar")
     public ProdutoResponse desativar(@PathVariable Long id) {
         return ProdutoResponse.de(service.desativar(id));
     }
 
+    @Requer(Papel.GERENTE)
     @PatchMapping("/{id}/reativar")
     public ProdutoResponse reativar(@PathVariable Long id) {
         return ProdutoResponse.de(service.reativar(id));

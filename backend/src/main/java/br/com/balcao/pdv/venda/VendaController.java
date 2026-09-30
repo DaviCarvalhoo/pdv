@@ -1,6 +1,7 @@
 package br.com.balcao.pdv.venda;
 
 import br.com.balcao.pdv.fiscal.NfceService;
+import br.com.balcao.pdv.usuario.Contexto;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -20,6 +21,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/vendas")
@@ -28,6 +30,7 @@ public class VendaController {
 
     private final VendaService service;
     private final NfceService nfceService;
+    private final Contexto contexto;
 
     public record ItemRequest(Long produtoId, @Size(max = 30) String codigo, BigDecimal quantidade) {
     }
@@ -40,7 +43,16 @@ public class VendaController {
                                    @Size(max = 60) String identificadorTransacao) {
     }
 
+    public record DescontoRequest(BigDecimal valor, BigDecimal percentual) {
+    }
+
     public record ConsumidorRequest(@Size(max = 18) String documento) {
+    }
+
+    public record ClienteRequest(Long clienteId) {
+    }
+
+    public record EsperaRequest(@Size(max = 40) String identificacao) {
     }
 
     public record MotivoRequest(@Size(max = 255) String motivo) {
@@ -52,13 +64,18 @@ public class VendaController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public VendaResponse iniciar() {
-        return service.iniciar();
+        return service.iniciar(contexto.operadorId());
     }
 
     /** 200 com a venda em andamento no caixa atual ou 204 se não houver. */
     @GetMapping("/aberta")
     public ResponseEntity<VendaResponse> emAndamento() {
         return service.emAndamento().map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    @GetMapping("/em-espera")
+    public List<VendaResumo> emEspera() {
+        return service.emEspera();
     }
 
     @GetMapping
@@ -68,9 +85,11 @@ public class VendaController {
             @RequestParam(required = false) StatusVenda status,
             @RequestParam(required = false) Long caixaId,
             @RequestParam(required = false) FormaPagamento forma,
+            @RequestParam(required = false) Long operadorId,
+            @RequestParam(required = false) Long clienteId,
             @PageableDefault(size = 20, sort = "dataAbertura", direction = Sort.Direction.DESC) Pageable pageable) {
         FiltroVendas filtro = new FiltroVendas(inicioDoDia(inicio), fim != null ? inicioDoDia(fim.plusDays(1)) : null,
-                status, caixaId, forma);
+                status, caixaId, forma, operadorId, clienteId);
         return new HistoricoResponse(service.historico(filtro, pageable), service.totalizadores(filtro));
     }
 
@@ -101,6 +120,11 @@ public class VendaController {
         return service.removerItem(id, itemId);
     }
 
+    @PutMapping("/{id}/desconto")
+    public VendaResponse desconto(@PathVariable Long id, @RequestBody DescontoRequest req) {
+        return service.aplicarDesconto(id, req.valor(), req.percentual(), contexto::temAutorizacaoDeGerente);
+    }
+
     @GetMapping("/{id}/pagamentos")
     public VendaResponse pagamentos(@PathVariable Long id) {
         return service.detalhar(id);
@@ -117,9 +141,30 @@ public class VendaController {
         return service.removerPagamento(id, pagamentoId);
     }
 
+    /** BR Code do PIX no valor restante (ou no valor informado). */
+    @GetMapping("/{id}/pix")
+    public Map<String, Object> pix(@PathVariable Long id, @RequestParam(required = false) BigDecimal valor) {
+        return service.pix(id, valor);
+    }
+
     @PutMapping("/{id}/consumidor")
     public VendaResponse informarConsumidor(@PathVariable Long id, @Valid @RequestBody ConsumidorRequest req) {
         return service.informarConsumidor(id, req.documento());
+    }
+
+    @PutMapping("/{id}/cliente")
+    public VendaResponse vincularCliente(@PathVariable Long id, @RequestBody ClienteRequest req) {
+        return service.vincularCliente(id, req.clienteId());
+    }
+
+    @PostMapping("/{id}/espera")
+    public VendaResponse colocarEmEspera(@PathVariable Long id, @Valid @RequestBody(required = false) EsperaRequest req) {
+        return service.colocarEmEspera(id, req != null ? req.identificacao() : null);
+    }
+
+    @PostMapping("/{id}/retomar")
+    public VendaResponse retomar(@PathVariable Long id) {
+        return service.retomar(id);
     }
 
     /**
@@ -131,25 +176,22 @@ public class VendaController {
         service.finalizar(id);
         List<String> avisos = new ArrayList<>();
         nfceService.emitirSeAutomatico(id).ifPresent(avisos::add);
-        VendaResponse venda = service.detalhar(id);
-        if (avisos.isEmpty()) {
-            return venda;
-        }
-        avisos.addAll(venda.avisos());
-        return new VendaResponse(venda.id(), venda.caixaId(), venda.status(), venda.itens(), venda.pagamentos(),
-                venda.quantidadeItens(), venda.total(), venda.valorPago(), venda.restante(), venda.troco(),
-                venda.documentoConsumidor(), venda.dataAbertura(), venda.dataFinalizacao(), venda.dataCancelamento(),
-                venda.motivoCancelamento(), venda.notaFiscal(), avisos);
+        return service.detalhar(id).comAvisos(avisos);
     }
 
+    /** Cancelar venda com itens exige gerente (ou PIN do gerente). Venda vazia sai sem autorização. */
     @PostMapping("/{id}/cancelar")
     public VendaResponse cancelar(@PathVariable Long id, @Valid @RequestBody(required = false) MotivoRequest req) {
+        if (!service.detalhar(id).itens().isEmpty()) {
+            contexto.exigirGerente("Cancelar venda");
+        }
         return service.cancelar(id, req != null ? req.motivo() : null);
     }
 
     @PostMapping("/{id}/estornar")
     public VendaResponse estornar(@PathVariable Long id, @Valid @RequestBody(required = false) MotivoRequest req) {
-        return service.estornar(id, req != null ? req.motivo() : null);
+        contexto.exigirGerente("Estornar venda");
+        return service.estornar(id, req != null ? req.motivo() : null, contexto.operadorId());
     }
 
     private static OffsetDateTime inicioDoDia(LocalDate data) {

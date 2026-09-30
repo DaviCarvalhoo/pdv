@@ -1,5 +1,6 @@
 package br.com.balcao.pdv.fiscal;
 
+import br.com.balcao.pdv.loja.Loja;
 import br.com.balcao.pdv.produto.Produto;
 import br.com.balcao.pdv.venda.FormaPagamento;
 import br.com.balcao.pdv.venda.Venda;
@@ -14,9 +15,10 @@ public record DanfeNfce(
         Long notaId, Long vendaId, Integer serie, Integer numero, StatusNota status, Ambiente ambiente,
         OffsetDateTime dataEmissao, String chaveAcesso, String chaveFormatada, String protocolo,
         OffsetDateTime dataAutorizacao, String consumidor,
-        List<Item> itens, int quantidadeItens, BigDecimal valorTotal,
-        List<PagamentoDanfe> pagamentos, BigDecimal troco,
-        String urlConsulta, String urlQrCode) {
+        List<Item> itens, int quantidadeItens, BigDecimal subtotal, BigDecimal desconto, BigDecimal valorTotal,
+        List<PagamentoDanfe> pagamentos, BigDecimal troco, BigDecimal tributosAprox,
+        String urlConsulta, String urlQrCode,
+        String logo, String mensagemCupom, String operador) {
 
     public record Emitente(String razaoSocial, String nomeFantasia, String cnpj, String inscricaoEstadual,
                            String endereco) {
@@ -29,7 +31,7 @@ public record DanfeNfce(
     public record PagamentoDanfe(FormaPagamento forma, BigDecimal valor) {
     }
 
-    static DanfeNfce de(NotaFiscal n, ConfiguracaoFiscal c) {
+    static DanfeNfce de(NotaFiscal n, ConfiguracaoFiscal c, Loja loja) {
         Venda v = n.getVenda();
         String endereco = String.join(", ", c.getLogradouro(), c.getNumero(), c.getBairro())
                 + " - " + c.getMunicipio() + "/" + c.getUf();
@@ -46,8 +48,11 @@ public record DanfeNfce(
                 new Emitente(c.getRazaoSocial(), c.getNomeFantasia(), c.getCnpj(), c.getInscricaoEstadual(), endereco),
                 n.getId(), v.getId(), n.getSerie(), n.getNumero(), n.getStatus(), n.getAmbiente(), n.getDataEmissao(),
                 n.getChaveAcesso(), ChaveAcesso.formatada(n.getChaveAcesso()), n.getProtocolo(),
-                n.getDataAutorizacao(), v.getDocumentoConsumidor(), itens, itens.size(), v.getTotal(),
+                n.getDataAutorizacao(), v.getDocumentoConsumidor(), itens, itens.size(), v.getSubtotal(),
+                v.getDesconto(), v.getTotal(),
                 v.getPagamentos().stream().map(p -> new PagamentoDanfe(p.getForma(), p.getValor())).toList(),
-                v.getTroco(), c.getUrlConsulta(), n.getUrlQrCode());
+                v.getTroco(), v.getTributosAprox(), c.getUrlConsulta(), n.getUrlQrCode(),
+                loja.getLogo(), loja.getMensagemCupom(),
+                v.getOperador() != null ? v.getOperador().getNome() : null);
     }
 }

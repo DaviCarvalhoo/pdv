@@ -23,6 +23,16 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
 
     long countByAtivoTrue();
 
+    List<Produto> findByAtivoTrueAndAtalhoRapidoTrueOrderByNome();
+
+    @Query(value = """
+            select * from produto
+            where codigo_interno ~ '^[0-9]+$'
+              and coalesce(nullif(ltrim(codigo_interno, '0'), ''), '0') = :codigo
+            limit 1
+            """, nativeQuery = true)
+    Optional<Produto> porCodigoBalanca(@Param("codigo") String codigo);
+
     @Query("""
             select p from Produto p
             where (:ativo is null or p.ativo = :ativo)

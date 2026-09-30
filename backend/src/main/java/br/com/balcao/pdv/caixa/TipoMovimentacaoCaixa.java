@@ -4,6 +4,7 @@ public enum TipoMovimentacaoCaixa {
     SUPRIMENTO(1),
     SANGRIA(-1),
     VENDA_DINHEIRO(1),
+    RECEBIMENTO_CLIENTE(1),
     ESTORNO_VENDA(-1);
 
     /** Efeito no saldo físico do caixa. */

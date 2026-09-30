@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 
 @Entity
@@ -26,6 +27,21 @@ public class Produto {
     private BigDecimal preco;
     private String unidade = "UN";
 
+    @ManyToOne(fetch = FetchType.EAGER)
+    private Categoria categoria;
+
+    private BigDecimal precoCusto;
+
+    // Promoção com vigência (datas inclusivas)
+    private BigDecimal precoPromocional;
+    private LocalDate promocaoInicio;
+    private LocalDate promocaoFim;
+
+    /** Aparece como botão de acesso rápido no PDV (pão, cafezinho, sacola...). */
+    private boolean atalhoRapido;
+    /** Alíquota aproximada de tributos (Lei 12.741). Nulo = usa a da loja. */
+    private BigDecimal aliquotaTributos;
+
     // Dados fiscais (NFC-e)
     private String ncm;
     private String cfop = "5102";
@@ -43,6 +59,26 @@ public class Produto {
 
     @Version
     private Long version;
+
+    public boolean emPromocao(LocalDate dia) {
+        return precoPromocional != null
+                && (promocaoInicio == null || !dia.isBefore(promocaoInicio))
+                && (promocaoFim == null || !dia.isAfter(promocaoFim));
+    }
+
+    /** Preço que vale hoje: o promocional, se estiver em vigência. */
+    public BigDecimal precoVigente(LocalDate dia) {
+        return emPromocao(dia) ? precoPromocional : preco;
+    }
+
+    /** Margem sobre o preço de venda (%), ou nulo sem custo. */
+    public BigDecimal margem() {
+        if (precoCusto == null || preco == null || preco.signum() == 0) {
+            return null;
+        }
+        return preco.subtract(precoCusto).multiply(BigDecimal.valueOf(100))
+                .divide(preco, 1, java.math.RoundingMode.HALF_EVEN);
+    }
 
     public boolean isEstoqueBaixo() {
         return estoqueMinimo != null && estoqueAtual.compareTo(estoqueMinimo) <= 0;

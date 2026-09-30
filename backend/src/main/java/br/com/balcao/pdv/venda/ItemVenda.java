@@ -7,6 +7,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "item_venda")
@@ -28,14 +29,20 @@ public class ItemVenda {
     private String descricao;
     /** Preço praticado no momento da venda — não muda se o cadastro mudar depois. */
     private BigDecimal precoUnitario;
+    /** Custo no momento da venda, para o lucro bruto dos relatórios. */
+    private BigDecimal custoUnitario;
+    /** Vendido pelo preço promocional. */
+    private boolean promocional;
     private BigDecimal quantidade;
     private BigDecimal subtotal;
 
-    ItemVenda(Venda venda, Produto produto, BigDecimal quantidade) {
+    ItemVenda(Venda venda, Produto produto, BigDecimal quantidade, LocalDate dia) {
         this.venda = venda;
         this.produto = produto;
         this.descricao = produto.getNome();
-        this.precoUnitario = produto.getPreco();
+        this.precoUnitario = produto.precoVigente(dia);
+        this.promocional = produto.emPromocao(dia);
+        this.custoUnitario = produto.getPrecoCusto();
         alterarQuantidade(quantidade);
     }
 

@@ -11,7 +11,12 @@ import java.util.List;
 
 /** Filtros do histórico de vendas (RF-HIS-01). */
 public record FiltroVendas(OffsetDateTime inicio, OffsetDateTime fim, StatusVenda status, Long caixaId,
-                           FormaPagamento forma) {
+                           FormaPagamento forma, Long operadorId, Long clienteId) {
+
+    public FiltroVendas(OffsetDateTime inicio, OffsetDateTime fim, StatusVenda status, Long caixaId,
+                        FormaPagamento forma) {
+        this(inicio, fim, status, caixaId, forma, null, null);
+    }
 
     public Specification<Venda> especificacao() {
         return (root, query, cb) -> {
@@ -27,6 +32,12 @@ public record FiltroVendas(OffsetDateTime inicio, OffsetDateTime fim, StatusVend
             }
             if (caixaId != null) {
                 p.add(cb.equal(root.join("caixa", JoinType.INNER).get("id"), caixaId));
+            }
+            if (operadorId != null) {
+                p.add(cb.equal(root.get("operador").get("id"), operadorId));
+            }
+            if (clienteId != null) {
+                p.add(cb.equal(root.get("cliente").get("id"), clienteId));
             }
             if (forma != null) {
                 Subquery<Long> sub = query.subquery(Long.class);

@@ -3,6 +3,7 @@ package br.com.balcao.pdv.fiscal;
 import br.com.balcao.pdv.comum.ConflitoException;
 import br.com.balcao.pdv.comum.NaoEncontradoException;
 import br.com.balcao.pdv.comum.RegraNegocioException;
+import br.com.balcao.pdv.loja.LojaService;
 import br.com.balcao.pdv.venda.ItemVenda;
 import br.com.balcao.pdv.venda.StatusVenda;
 import br.com.balcao.pdv.venda.Venda;
@@ -33,16 +34,19 @@ public class NfceService {
     private final NotaFiscalRepository repository;
     private final VendaRepository vendaRepository;
     private final ConfiguracaoFiscalService configuracaoService;
+    private final LojaService lojaService;
     private final Map<TipoEmissor, EmissorNfce> emissores;
     private final TransactionTemplate transacao;
     private final Clock relogio;
 
     public NfceService(NotaFiscalRepository repository, VendaRepository vendaRepository,
-                       ConfiguracaoFiscalService configuracaoService, List<EmissorNfce> emissores,
+                       ConfiguracaoFiscalService configuracaoService, LojaService lojaService,
+                       List<EmissorNfce> emissores,
                        PlatformTransactionManager transactionManager, Clock relogio) {
         this.repository = repository;
         this.vendaRepository = vendaRepository;
         this.configuracaoService = configuracaoService;
+        this.lojaService = lojaService;
         this.emissores = emissores.stream().collect(Collectors.toMap(EmissorNfce::tipo, Function.identity()));
         this.transacao = new TransactionTemplate(transactionManager);
         this.relogio = relogio;
@@ -108,7 +112,8 @@ public class NfceService {
         nota.setDataEmissao(emissao);
         nota.setUrlQrCode(urlQr);
         nota.setXml(NfceXmlBuilder.montar(
-                new NfceXmlBuilder.Dados(config, venda, nota, codigoNumerico, emissao, urlQr)));
+                new NfceXmlBuilder.Dados(config, venda, nota, codigoNumerico, emissao, urlQr,
+                        lojaService.obter().getAliquotaTributos())));
 
         EmissorNfce emissor = emissor(config);
         try {
@@ -178,7 +183,7 @@ public class NfceService {
 
     @Transactional(readOnly = true)
     public DanfeNfce danfe(Long id) {
-        return DanfeNfce.de(buscar(id), configuracaoService.obter());
+        return DanfeNfce.de(buscar(id), configuracaoService.obter(), lojaService.obter());
     }
 
     private NotaFiscal buscar(Long id) {

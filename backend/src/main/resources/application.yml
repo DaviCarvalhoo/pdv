@@ -28,6 +28,3 @@ springdoc:
 
 balcao:
   cors-origins: ${CORS_ORIGINS:http://localhost:5173}
-  estoque:
-    # PERMITIR_E_AVISAR (padrão) ou BLOQUEAR
-    politica-saldo-insuficiente: ${ESTOQUE_POLITICA:PERMITIR_E_AVISAR}

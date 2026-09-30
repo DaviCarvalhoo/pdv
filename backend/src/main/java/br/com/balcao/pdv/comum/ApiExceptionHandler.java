@@ -24,6 +24,16 @@ public class ApiExceptionHandler {
         return problema(HttpStatus.NOT_FOUND, e);
     }
 
+    @ExceptionHandler(NaoAutenticadoException.class)
+    ProblemDetail naoAutenticado(NaoAutenticadoException e) {
+        return problema(HttpStatus.UNAUTHORIZED, e);
+    }
+
+    @ExceptionHandler(SemPermissaoException.class)
+    ProblemDetail semPermissao(SemPermissaoException e) {
+        return problema(HttpStatus.FORBIDDEN, e);
+    }
+
     @ExceptionHandler(ConflitoException.class)
     ProblemDetail conflito(ConflitoException e) {
         return problema(HttpStatus.CONFLICT, e);

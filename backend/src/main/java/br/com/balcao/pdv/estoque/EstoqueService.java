@@ -3,10 +3,11 @@ package br.com.balcao.pdv.estoque;
 import br.com.balcao.pdv.comum.Dinheiro;
 import br.com.balcao.pdv.comum.NaoEncontradoException;
 import br.com.balcao.pdv.comum.RegraNegocioException;
+import br.com.balcao.pdv.loja.Loja;
+import br.com.balcao.pdv.loja.LojaRepository;
 import br.com.balcao.pdv.produto.Produto;
 import br.com.balcao.pdv.produto.ProdutoRepository;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -15,6 +16,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.Map;
 
 /**
@@ -28,8 +31,8 @@ public class EstoqueService {
     private final ProdutoRepository produtoRepository;
     private final MovimentacaoEstoqueRepository repository;
 
-    @Value("${balcao.estoque.politica-saldo-insuficiente}")
-    private PoliticaSaldoInsuficiente politica;
+    private final LojaRepository lojaRepository;
+    private final Clock relogio;
 
     @Transactional
     public MovimentacaoEstoque entrada(Long produtoId, BigDecimal quantidade, String observacao) {
@@ -54,6 +57,8 @@ public class EstoqueService {
     @Transactional(propagation = Propagation.MANDATORY)
     public MovimentacaoEstoque saidaVenda(Long produtoId, BigDecimal quantidade, Long vendaId) {
         Produto produto = travar(produtoId);
+        PoliticaSaldoInsuficiente politica = lojaRepository.findById(Loja.ID)
+                .map(Loja::getPoliticaEstoque).orElse(PoliticaSaldoInsuficiente.PERMITIR_E_AVISAR);
         if (politica == PoliticaSaldoInsuficiente.BLOQUEAR && produto.getEstoqueAtual().compareTo(quantidade) < 0) {
             throw new RegraNegocioException("ESTOQUE_INSUFICIENTE",
                     "Estoque insuficiente para " + produto.getNome() + ".",
@@ -86,7 +91,7 @@ public class EstoqueService {
                                           Long vendaId, String observacao) {
         BigDecimal qtd = Dinheiro.quantidade(quantidade);
         MovimentacaoEstoque mov = new MovimentacaoEstoque(produto, tipo, qtd, produto.getEstoqueAtual(),
-                vendaId, StringUtils.hasText(observacao) ? observacao.trim() : null);
+                vendaId, StringUtils.hasText(observacao) ? observacao.trim() : null, OffsetDateTime.now(relogio));
         produto.aplicarSaldoEstoque(mov.getSaldoPosterior());
         return repository.save(mov);
     }

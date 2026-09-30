@@ -9,7 +9,7 @@ import java.time.Clock;
 public class RelogioConfig {
 
     @Bean
-    Clock relogio() {
-        return Clock.systemDefaultZone();
+    RelogioAjustavel relogio() {
+        return new RelogioAjustavel(Clock.systemDefaultZone());
     }
 }

@@ -24,11 +24,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 import java.math.BigDecimal;
 
@@ -37,12 +33,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Fluxos ponta a ponta contra um PostgreSQL real (Testcontainers). */
 @SpringBootTest
-@Testcontainers
-class FluxoCompletoIntegracaoTest {
-
-    @Container
-    @ServiceConnection
-    static PostgreSQLContainer<?> postgres = new PostgreSQLContainer<>("postgres:16-alpine");
+class FluxoCompletoIntegracaoTest extends IntegracaoBase {
 
     @Autowired CaixaService caixaService;
     @Autowired VendaService vendaService;
@@ -59,8 +50,7 @@ class FluxoCompletoIntegracaoTest {
 
     @BeforeEach
     void limparBase() {
-        jdbc.execute("TRUNCATE nota_fiscal, movimentacao_caixa, movimentacao_estoque, pagamento, item_venda, venda, "
-                + "caixa, produto RESTART IDENTITY CASCADE");
+        jdbc.execute(LIMPAR_BASE);
         jdbc.update("UPDATE configuracao_fiscal SET proximo_numero = 1, emissao_automatica = true");
         refri = produtoService.cadastrar(produto("Refrigerante 2L", "9.50", "2000000000015", 20));
         cafe = produtoService.cadastrar(produto("Café 500g", "18.90", "2000000000039", 10));
@@ -167,7 +157,7 @@ class FluxoCompletoIntegracaoTest {
     }
 
     private static ProdutoRequest produto(String nome, String preco, String gtin, int estoque) {
-        return new ProdutoRequest(nome, new BigDecimal(preco), null, gtin, "UN", "22021000", "5102", 0, "102",
-                null, BigDecimal.valueOf(estoque));
+        return ProdutoRequest.basico(nome, new BigDecimal(preco), null, gtin, "UN", "22021000", null,
+                BigDecimal.valueOf(estoque));
     }
 }

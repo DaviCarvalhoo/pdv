@@ -27,10 +27,12 @@ public class MovimentacaoCaixa {
     private BigDecimal valor;
     private String descricao;
     private Long vendaId;
+    private Long operadorId;
     private OffsetDateTime dataHora;
 
     public MovimentacaoCaixa(Caixa caixa, TipoMovimentacaoCaixa tipo, BigDecimal valor, String descricao,
-                             Long vendaId, OffsetDateTime agora) {
+                             Long vendaId, Long operadorId, OffsetDateTime agora) {
+        this.operadorId = operadorId;
         this.caixa = caixa;
         this.tipo = tipo;
         this.valor = valor;

@@ -38,6 +38,11 @@ public class CaixaService {
 
     @Transactional
     public Caixa abrir(BigDecimal saldoInicial) {
+        return abrir(saldoInicial, null);
+    }
+
+    @Transactional
+    public Caixa abrir(BigDecimal saldoInicial, Long operadorId) {
         if (saldoInicial == null || saldoInicial.signum() < 0) {
             throw new RegraNegocioException("SALDO_INICIAL_INVALIDO", "O saldo inicial não pode ser negativo.");
         }
@@ -46,7 +51,7 @@ public class CaixaService {
                     Map.of("caixaId", c.getId()));
         });
         try {
-            Caixa caixa = repository.saveAndFlush(new Caixa(Dinheiro.valor(saldoInicial), agora()));
+            Caixa caixa = repository.saveAndFlush(new Caixa(Dinheiro.valor(saldoInicial), agora(), operadorId));
             log.info("Caixa #{} aberto com saldo inicial {}", caixa.getId(), caixa.getSaldoInicial());
             return caixa;
         } catch (DataIntegrityViolationException e) {
@@ -84,13 +89,24 @@ public class CaixaService {
 
     @Transactional
     public MovimentacaoCaixa suprimento(Long caixaId, BigDecimal valor, String descricao) {
+        return suprimento(caixaId, valor, descricao, null);
+    }
+
+    @Transactional
+    public MovimentacaoCaixa suprimento(Long caixaId, BigDecimal valor, String descricao, Long operadorId) {
         Caixa caixa = travarAberto(caixaId);
         exigirPositivo(valor);
-        return registrar(caixa, TipoMovimentacaoCaixa.SUPRIMENTO, valor, texto(descricao, "Suprimento"), null);
+        return registrar(caixa, TipoMovimentacaoCaixa.SUPRIMENTO, valor, texto(descricao, "Suprimento"), null,
+                operadorId);
     }
 
     @Transactional
     public MovimentacaoCaixa sangria(Long caixaId, BigDecimal valor, String descricao) {
+        return sangria(caixaId, valor, descricao, null);
+    }
+
+    @Transactional
+    public MovimentacaoCaixa sangria(Long caixaId, BigDecimal valor, String descricao, Long operadorId) {
         Caixa caixa = travarAberto(caixaId);
         exigirPositivo(valor);
         BigDecimal saldo = saldoEsperado(caixa);
@@ -99,22 +115,30 @@ public class CaixaService {
                     "A sangria não pode ser maior que o saldo em dinheiro do caixa (" + saldo + ").",
                     Map.of("saldoEsperado", saldo));
         }
-        return registrar(caixa, TipoMovimentacaoCaixa.SANGRIA, valor, texto(descricao, "Sangria"), null);
+        return registrar(caixa, TipoMovimentacaoCaixa.SANGRIA, valor, texto(descricao, "Sangria"), null,
+                operadorId);
     }
 
     /** Entrada do dinheiro líquido (recebido − troco) de uma venda finalizada. */
     @Transactional(propagation = Propagation.MANDATORY)
-    public void registrarVendaDinheiro(Caixa caixa, BigDecimal valor, Long vendaId) {
+    public void registrarVendaDinheiro(Caixa caixa, BigDecimal valor, Long vendaId, Long operadorId) {
         if (Dinheiro.positivo(valor)) {
-            registrar(caixa, TipoMovimentacaoCaixa.VENDA_DINHEIRO, valor, "Venda #" + vendaId, vendaId);
+            registrar(caixa, TipoMovimentacaoCaixa.VENDA_DINHEIRO, valor, "Venda #" + vendaId, vendaId, operadorId);
         }
     }
 
     @Transactional(propagation = Propagation.MANDATORY)
-    public void registrarEstornoVenda(Caixa caixa, BigDecimal valor, Long vendaId) {
+    public void registrarEstornoVenda(Caixa caixa, BigDecimal valor, Long vendaId, Long operadorId) {
         if (Dinheiro.positivo(valor)) {
-            registrar(caixa, TipoMovimentacaoCaixa.ESTORNO_VENDA, valor, "Estorno da venda #" + vendaId, vendaId);
+            registrar(caixa, TipoMovimentacaoCaixa.ESTORNO_VENDA, valor, "Estorno da venda #" + vendaId, vendaId,
+                    operadorId);
         }
+    }
+
+    /** Fiado recebido em dinheiro entra na gaveta. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registrarRecebimentoCliente(Caixa caixa, BigDecimal valor, String cliente, Long operadorId) {
+        registrar(caixa, TipoMovimentacaoCaixa.RECEBIMENTO_CLIENTE, valor, "Fiado de " + cliente, null, operadorId);
     }
 
     @Transactional(readOnly = true)
@@ -136,6 +160,11 @@ public class CaixaService {
 
     @Transactional
     public ExtratoCaixa fechar(Long caixaId, BigDecimal valorContado) {
+        return fechar(caixaId, valorContado, null);
+    }
+
+    @Transactional
+    public ExtratoCaixa fechar(Long caixaId, BigDecimal valorContado, Long operadorId) {
         if (valorContado == null || valorContado.signum() < 0) {
             throw new RegraNegocioException("VALOR_CONTADO_INVALIDO", "Informe o valor contado em dinheiro (≥ 0).");
         }
@@ -146,7 +175,7 @@ public class CaixaService {
                     "Finalize ou cancele as vendas em aberto antes de fechar o caixa.",
                     Map.of("vendasAbertas", vendasAbertas));
         }
-        caixa.fechar(saldoEsperado(caixa), Dinheiro.valor(valorContado), agora());
+        caixa.fechar(saldoEsperado(caixa), Dinheiro.valor(valorContado), agora(), operadorId);
         log.info("Caixa #{} fechado: esperado {}, contado {}, diferença {} ({})", caixa.getId(),
                 caixa.getSaldoEsperado(), caixa.getValorContado(), caixa.getDiferenca(), caixa.getSituacaoConferencia());
         return extrato(caixa);
@@ -182,6 +211,7 @@ public class CaixaService {
                 soma(id, TipoMovimentacaoCaixa.SUPRIMENTO),
                 soma(id, TipoMovimentacaoCaixa.SANGRIA),
                 soma(id, TipoMovimentacaoCaixa.VENDA_DINHEIRO),
+                soma(id, TipoMovimentacaoCaixa.RECEBIMENTO_CLIENTE),
                 soma(id, TipoMovimentacaoCaixa.ESTORNO_VENDA),
                 esperado,
                 caixa.getValorContado(),
@@ -208,9 +238,9 @@ public class CaixaService {
     }
 
     private MovimentacaoCaixa registrar(Caixa caixa, TipoMovimentacaoCaixa tipo, BigDecimal valor, String descricao,
-                                        Long vendaId) {
+                                        Long vendaId, Long operadorId) {
         return movimentacaoRepository.save(
-                new MovimentacaoCaixa(caixa, tipo, Dinheiro.valor(valor), descricao, vendaId, agora()));
+                new MovimentacaoCaixa(caixa, tipo, Dinheiro.valor(valor), descricao, vendaId, operadorId, agora()));
     }
 
     private static void exigirPositivo(BigDecimal valor) {

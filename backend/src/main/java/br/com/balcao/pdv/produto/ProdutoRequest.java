@@ -3,6 +3,7 @@ package br.com.balcao.pdv.produto;
 import jakarta.validation.constraints.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 public record ProdutoRequest(
         @NotBlank(message = "Nome é obrigatório") @Size(max = 120) String nome,
@@ -17,5 +18,21 @@ public record ProdutoRequest(
         @Min(0) @Max(8) Integer origem,
         @Pattern(regexp = "\\d{3}", message = "CSOSN deve ter 3 dígitos") String csosn,
         @PositiveOrZero BigDecimal estoqueMinimo,
-        @PositiveOrZero(message = "Estoque inicial não pode ser negativo") BigDecimal estoqueInicial) {
+        @PositiveOrZero(message = "Estoque inicial não pode ser negativo") BigDecimal estoqueInicial,
+        Long categoriaId,
+        @PositiveOrZero(message = "Custo não pode ser negativo") @Digits(integer = 10, fraction = 2) BigDecimal precoCusto,
+        @Positive(message = "Preço promocional deve ser maior que zero") @Digits(integer = 10, fraction = 2)
+        BigDecimal precoPromocional,
+        LocalDate promocaoInicio,
+        LocalDate promocaoFim,
+        Boolean atalhoRapido,
+        @DecimalMin("0") @DecimalMax("100") BigDecimal aliquotaTributos) {
+
+    /** Atalho para o cadastro básico (usado nos dados de demonstração e nos testes). */
+    public static ProdutoRequest basico(String nome, BigDecimal preco, String codigoInterno, String gtin,
+                                        String unidade, String ncm, BigDecimal estoqueMinimo,
+                                        BigDecimal estoqueInicial) {
+        return new ProdutoRequest(nome, preco, codigoInterno, gtin, unidade, ncm, "5102", 0, "102", estoqueMinimo,
+                estoqueInicial, null, null, null, null, null, null, null);
+    }
 }

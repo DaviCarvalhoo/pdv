@@ -33,7 +33,7 @@ public class MovimentacaoEstoque {
     private OffsetDateTime dataHora;
 
     public MovimentacaoEstoque(Produto produto, TipoMovimentacaoEstoque tipo, BigDecimal quantidade,
-                               BigDecimal saldoAnterior, Long vendaId, String observacao) {
+                               BigDecimal saldoAnterior, Long vendaId, String observacao, OffsetDateTime agora) {
         this.produto = produto;
         this.tipo = tipo;
         this.quantidade = quantidade;
@@ -41,6 +41,6 @@ public class MovimentacaoEstoque {
         this.saldoPosterior = saldoAnterior.add(quantidade);
         this.vendaId = vendaId;
         this.observacao = observacao;
-        this.dataHora = OffsetDateTime.now();
+        this.dataHora = agora;
     }
 }

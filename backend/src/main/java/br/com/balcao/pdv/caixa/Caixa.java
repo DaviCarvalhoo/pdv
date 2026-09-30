@@ -33,10 +33,18 @@ public class Caixa {
     @Enumerated(EnumType.STRING)
     private SituacaoConferencia situacaoConferencia;
 
+    private Long operadorAberturaId;
+    private Long operadorFechamentoId;
+
     @Version
     private Long version;
 
     public Caixa(BigDecimal saldoInicial, OffsetDateTime agora) {
+        this(saldoInicial, agora, null);
+    }
+
+    public Caixa(BigDecimal saldoInicial, OffsetDateTime agora, Long operadorId) {
+        this.operadorAberturaId = operadorId;
         this.status = StatusCaixa.ABERTO;
         this.saldoInicial = saldoInicial;
         this.dataAbertura = agora;
@@ -52,8 +60,9 @@ public class Caixa {
         }
     }
 
-    void fechar(BigDecimal esperado, BigDecimal contado, OffsetDateTime agora) {
+    void fechar(BigDecimal esperado, BigDecimal contado, OffsetDateTime agora, Long operadorId) {
         exigirAberto();
+        this.operadorFechamentoId = operadorId;
         this.saldoEsperado = esperado;
         this.valorContado = contado;
         this.diferenca = contado.subtract(esperado);

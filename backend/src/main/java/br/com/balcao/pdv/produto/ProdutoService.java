@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +21,7 @@ public class ProdutoService {
 
     private final ProdutoRepository repository;
     private final EstoqueService estoqueService;
+    private final CategoriaRepository categoriaRepository;
 
     @Transactional
     public Produto cadastrar(ProdutoRequest req) {
@@ -72,6 +74,28 @@ public class ProdutoService {
     }
 
     @Transactional(readOnly = true)
+    public List<Produto> atalhos() {
+        return repository.findByAtivoTrueAndAtalhoRapidoTrueOrderByNome();
+    }
+
+    /** GTIN ou código interno, sem lançar erro (usado antes de tentar a etiqueta de balança). */
+    @Transactional(readOnly = true)
+    public Optional<Produto> porCodigoOpcional(String codigo) {
+        return repository.findByGtin(codigo).or(() -> repository.findByCodigoInterno(codigo));
+    }
+
+    /** Produto pelo código da etiqueta de balança (código interno, ignorando zeros à esquerda). */
+    @Transactional(readOnly = true)
+    public Optional<Produto> porCodigoBalanca(String codigo) {
+        return repository.porCodigoBalanca(semZerosAEsquerda(codigo));
+    }
+
+    static String semZerosAEsquerda(String codigo) {
+        String s = codigo.replaceFirst("^0+", "");
+        return s.isEmpty() ? "0" : s;
+    }
+
+    @Transactional(readOnly = true)
     public long contarAtivos() {
         return repository.countByAtivoTrue();
     }
@@ -117,6 +141,22 @@ public class ProdutoService {
         p.setOrigem(req.origem() != null ? req.origem() : 0);
         p.setCsosn(StringUtils.hasText(req.csosn()) ? req.csosn() : "102");
         p.setEstoqueMinimo(req.estoqueMinimo() != null ? Dinheiro.quantidade(req.estoqueMinimo()) : null);
+        p.setCategoria(req.categoriaId() == null ? null : categoriaRepository.findById(req.categoriaId())
+                .orElseThrow(() -> new NaoEncontradoException("Categoria", req.categoriaId())));
+        p.setPrecoCusto(req.precoCusto() != null ? Dinheiro.valor(req.precoCusto()) : null);
+        if (req.precoPromocional() != null && req.precoPromocional().compareTo(req.preco()) >= 0) {
+            throw new RegraNegocioException("PROMOCAO_INVALIDA", "O preço promocional deve ser menor que o preço normal.");
+        }
+        if (req.promocaoInicio() != null && req.promocaoFim() != null
+                && req.promocaoFim().isBefore(req.promocaoInicio())) {
+            throw new RegraNegocioException("PROMOCAO_INVALIDA", "O fim da promoção é anterior ao início.");
+        }
+        boolean temPromocao = req.precoPromocional() != null;
+        p.setPrecoPromocional(temPromocao ? Dinheiro.valor(req.precoPromocional()) : null);
+        p.setPromocaoInicio(temPromocao ? req.promocaoInicio() : null);
+        p.setPromocaoFim(temPromocao ? req.promocaoFim() : null);
+        p.setAtalhoRapido(Boolean.TRUE.equals(req.atalhoRapido()));
+        p.setAliquotaTributos(req.aliquotaTributos());
     }
 
     private void validarUnicidade(Produto p, Long id) {

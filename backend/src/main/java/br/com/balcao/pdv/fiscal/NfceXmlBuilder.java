@@ -5,12 +5,14 @@ import br.com.balcao.pdv.produto.Produto;
 import br.com.balcao.pdv.venda.FormaPagamento;
 import br.com.balcao.pdv.venda.ItemVenda;
 import br.com.balcao.pdv.venda.Pagamento;
+import br.com.balcao.pdv.venda.Rateio;
 import br.com.balcao.pdv.venda.Venda;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.OffsetDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.Set;
 
 /**
@@ -35,7 +37,7 @@ public final class NfceXmlBuilder {
     }
 
     public record Dados(ConfiguracaoFiscal emitente, Venda venda, NotaFiscal nota, String codigoNumerico,
-                        OffsetDateTime emissao, String urlQrCode) {
+                        OffsetDateTime emissao, String urlQrCode, BigDecimal aliquotaTributosPadrao) {
     }
 
     public static String montar(Dados d) {
@@ -105,10 +107,11 @@ public final class NfceXmlBuilder {
             fechar("dest");
         }
 
-        int numeroItem = 1;
-        for (ItemVenda item : v.getItens()) {
-            detalhe(numeroItem, item, homologacao && numeroItem == 1);
-            numeroItem++;
+        List<BigDecimal> descontos = Rateio.descontos(v);
+        List<BigDecimal> tributos = Rateio.tributos(v, d.aliquotaTributosPadrao());
+        BigDecimal totalTributos = Rateio.soma(tributos);
+        for (int i = 0; i < v.getItens().size(); i++) {
+            detalhe(i + 1, v.getItens().get(i), descontos.get(i), tributos.get(i), homologacao && i == 0);
         }
 
         abrir("total");
@@ -117,12 +120,17 @@ public final class NfceXmlBuilder {
                 "vFCPSTRet"}) {
             tag(campo, "0.00");
         }
-        tag("vProd", valor(v.getTotal()));
-        for (String campo : new String[]{"vFrete", "vSeg", "vDesc", "vII", "vIPI", "vIPIDevol", "vPIS", "vCOFINS",
-                "vOutro"}) {
+        tag("vProd", valor(v.getSubtotal()));
+        tag("vFrete", "0.00");
+        tag("vSeg", "0.00");
+        tag("vDesc", valor(v.getDesconto()));
+        for (String campo : new String[]{"vII", "vIPI", "vIPIDevol", "vPIS", "vCOFINS", "vOutro"}) {
             tag(campo, "0.00");
         }
         tag("vNF", valor(v.getTotal()));
+        if (totalTributos.signum() > 0) {
+            tag("vTotTrib", valor(totalTributos));
+        }
         fechar("ICMSTot");
         fechar("total");
 
@@ -149,7 +157,11 @@ public final class NfceXmlBuilder {
         fechar("pag");
 
         abrir("infAdic");
-        tag("infCpl", "Venda #" + v.getId() + " - Caixa #" + v.getCaixa().getId());
+        String complemento = "Venda #" + v.getId() + " - Caixa #" + v.getCaixa().getId();
+        if (totalTributos.signum() > 0) {
+            complemento += " - Tributos totais aproximados R$ " + valor(totalTributos) + " (Lei 12.741/2012)";
+        }
+        tag("infCpl", complemento);
         fechar("infAdic");
 
         fechar("infNFe");
@@ -163,7 +175,8 @@ public final class NfceXmlBuilder {
         return xml.toString();
     }
 
-    private void detalhe(int numero, ItemVenda item, boolean textoHomologacao) {
+    private void detalhe(int numero, ItemVenda item, BigDecimal desconto, BigDecimal tributos,
+                         boolean textoHomologacao) {
         Produto p = item.getProduto();
         String codigo = p.getCodigoInterno() != null ? p.getCodigoInterno() : String.valueOf(p.getId());
         String gtin = p.getGtin() != null ? p.getGtin() : "SEM GTIN";
@@ -183,10 +196,16 @@ public final class NfceXmlBuilder {
         tag("uTrib", p.getUnidade());
         tag("qTrib", quantidade(item.getQuantidade()));
         tag("vUnTrib", unitario(item.getPrecoUnitario()));
+        if (desconto.signum() > 0) {
+            tag("vDesc", valor(desconto));
+        }
         tag("indTot", "1");
         fechar("prod");
 
         abrir("imposto");
+        if (tributos.signum() > 0) {
+            tag("vTotTrib", valor(tributos));
+        }
         abrir("ICMS");
         String grupo = "500".equals(p.getCsosn()) ? "ICMSSN500" : "ICMSSN102";
         abrir(grupo);
