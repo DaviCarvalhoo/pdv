@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Danfe from '../components/Danfe';
 import Painel from '../components/Painel';
-import { api, type Danfe as DanfeDados, type Historico, type Venda } from '../lib/api';
+import { api, baixarArquivo, csv, type Danfe as DanfeDados, type Historico, type Venda } from '../lib/api';
 import { useAvisos, useCaixa } from '../lib/contexto';
 import { dataHora, diasAtras, documento, hoje, moeda, nomeForma, nomeStatusVenda, qtd } from '../lib/format';
 
@@ -24,6 +24,25 @@ export default function PaginaVendas() {
 
   const vendas = dados?.vendas;
 
+  /** Exporta todas as vendas do filtro (não só a página atual) em CSV para o Excel. */
+  const exportar = async () => {
+    try {
+      const tudo = await api.historico({ ...filtro, page: 0, size: 5000 });
+      baixarArquivo(
+        `vendas-${filtro.inicio}-a-${filtro.fim}.csv`,
+        csv([
+          ['Venda', 'Data', 'Status', 'Operador', 'Cliente', 'Pagamento', 'Itens', 'Desconto', 'Total'],
+          ...tudo.vendas.content.map((v) => [
+            v.id, dataHora(v.dataFinalizacao ?? v.dataAbertura), nomeStatusVenda[v.status], v.operadorNome, v.clienteNome,
+            v.formas.map((f) => nomeForma[f]).join(' + '), v.quantidadeItens, v.desconto, v.total,
+          ]),
+        ]),
+      );
+    } catch (e) {
+      erro(e);
+    }
+  };
+
   return (
     <div className="pagina">
       <header className="pagina__topo">
@@ -31,12 +50,17 @@ export default function PaginaVendas() {
           <p className="sobretitulo">Histórico</p>
           <h1>Vendas</h1>
         </div>
-        {dados && (
-          <div className="gaveta">
-            <span>{dados.totalizadores.quantidade} vendas no filtro</span>
-            <strong>{moeda(dados.totalizadores.valorTotal)}</strong>
-          </div>
-        )}
+        <div className="pagina__acoes">
+          {dados && (
+            <div className="gaveta">
+              <span>{dados.totalizadores.quantidade} vendas no filtro</span>
+              <strong>{moeda(dados.totalizadores.valorTotal)}</strong>
+            </div>
+          )}
+          <button className="botao botao--secundario" onClick={exportar}>
+            Exportar (CSV)
+          </button>
+        </div>
       </header>
 
       <div className="filtros">
@@ -83,6 +107,7 @@ export default function PaginaVendas() {
             <th>Data</th>
             <th>Status</th>
             <th>Pagamento</th>
+            <th>Operador</th>
             <th className="tabela__num">Itens</th>
             <th className="tabela__num">Total</th>
           </tr>
@@ -95,7 +120,11 @@ export default function PaginaVendas() {
               <td>
                 <span className={`selo selo--${v.status.toLowerCase()}`}>{nomeStatusVenda[v.status]}</span>
               </td>
-              <td>{v.formas.map((f) => nomeForma[f]).join(' + ') || '—'}</td>
+              <td>
+                {v.formas.map((f) => nomeForma[f]).join(' + ') || '—'}
+                {v.clienteNome && <small className="bloco-texto">{v.clienteNome}</small>}
+              </td>
+              <td className="tabela__fraco">{v.operadorNome ?? '—'}</td>
               <td className="tabela__num">{v.quantidadeItens}</td>
               <td className="tabela__num">{moeda(v.total)}</td>
             </tr>
@@ -174,6 +203,8 @@ function DetalheVenda({ id, aoMudar }: { id: number; aoMudar: () => void }) {
         <span className={`selo selo--${venda.status.toLowerCase()}`}>{nomeStatusVenda[venda.status]}</span>
         <span>Caixa #{venda.caixaId}</span>
         <span>{dataHora(venda.dataFinalizacao ?? venda.dataAbertura)}</span>
+        {venda.operadorNome && <span>Operador {venda.operadorNome}</span>}
+        {venda.cliente && <span>Cliente {venda.cliente.nome}</span>}
         {venda.documentoConsumidor && <span>CPF/CNPJ {documento(venda.documentoConsumidor)}</span>}
       </div>
       {venda.motivoCancelamento && <p className="dica">Motivo: {venda.motivoCancelamento}</p>}
@@ -192,6 +223,12 @@ function DetalheVenda({ id, aoMudar }: { id: number; aoMudar: () => void }) {
               <td className="tabela__num">{moeda(i.subtotal)}</td>
             </tr>
           ))}
+          {venda.desconto > 0 && (
+            <tr className="tabela__fraco">
+              <td>Desconto</td>
+              <td className="tabela__num">−{moeda(venda.desconto)}</td>
+            </tr>
+          )}
           <tr className="tabela__total">
             <td>Total</td>
             <td className="tabela__num">{moeda(venda.total)}</td>

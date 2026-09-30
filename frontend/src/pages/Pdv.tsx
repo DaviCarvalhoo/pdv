@@ -1,42 +1,50 @@
-import { forwardRef, useCallback, useEffect, useRef, useState } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import Danfe from '../components/Danfe';
-import { api, ApiError, type Danfe as DanfeDados, type FormaPagamento, type Produto, type Venda } from '../lib/api';
-import { useAtalhos, useAvisos, useCaixa } from '../lib/contexto';
-import { documento, moeda, nomeForma, numero, parseValor, qtd } from '../lib/format';
+import { PainelCliente, PainelConsulta, PainelDesconto, PainelEspera, CampoCpf, ConfirmarCancelamento } from '../components/PdvPaineis';
+import Pagamento from '../components/PdvPagamento';
+import { api, ApiError, type Danfe as DanfeDados, type Produto, type Venda, type VendaResumo } from '../lib/api';
+import { useAtalhos, useAvisos, useCaixa, useSessao } from '../lib/contexto';
+import { documento, moeda, numero, parseValor, qtd } from '../lib/format';
 
 type Modo = 'itens' | 'pagamento' | 'concluida';
+type Painel = 'cliente' | 'desconto' | 'espera' | 'consulta' | 'cpf' | 'cancelar' | null;
 
-const FORMAS: { forma: FormaPagamento; tecla: string }[] = [
-  { forma: 'DINHEIRO', tecla: 'D' },
-  { forma: 'PIX', tecla: 'P' },
-  { forma: 'CARTAO_DEBITO', tecla: 'B' },
-  { forma: 'CARTAO_CREDITO', tecla: 'C' },
-];
+export interface LeitorHandle {
+  focar: () => void;
+  preencher: (texto: string, cursorNoInicio?: boolean) => void;
+}
 
 export default function PaginaPdv() {
   const { caixa, carregando, recarregar } = useCaixa();
+  const { operador } = useSessao();
   const { avisar, erro } = useAvisos();
 
   const [venda, setVenda] = useState<Venda | null>(null);
   const [modo, setModo] = useState<Modo>('itens');
+  const [painel, setPainel] = useState<Painel>(null);
   const [ocupado, setOcupado] = useState(false);
-  const [selecionado, setSelecionado] = useState<number>(-1);
+  const [selecionado, setSelecionado] = useState(-1);
   const [ultimoItem, setUltimoItem] = useState<number | null>(null);
   const [danfe, setDanfe] = useState<DanfeDados | null>(null);
-  const [confirmarCancelamento, setConfirmarCancelamento] = useState(false);
-  const [editandoCpf, setEditandoCpf] = useState(false);
+  const [atalhos, setAtalhos] = useState<Produto[]>([]);
+  const [emEspera, setEmEspera] = useState<VendaResumo[]>([]);
 
-  const leitorRef = useRef<HTMLInputElement>(null);
-  const focarLeitor = () => setTimeout(() => leitorRef.current?.focus(), 0);
+  const leitor = useRef<LeitorHandle>(null);
+  const focarLeitor = () => setTimeout(() => leitor.current?.focar(), 0);
 
-  // Retoma a venda em andamento só quando o caixa muda (não a cada atualização do saldo da gaveta,
-  // senão a tela de venda concluída seria apagada logo após finalizar).
   const caixaId = caixa?.id;
+  const recarregarEspera = useCallback(() => {
+    api.vendasEmEspera().then(setEmEspera).catch(() => undefined);
+  }, []);
+
+  // Retoma a venda em andamento só quando o caixa muda (não a cada atualização do saldo da gaveta).
   useEffect(() => {
     if (!caixaId) return;
     api.vendaAberta().then((v) => setVenda(v ?? null)).catch(erro);
-  }, [caixaId, erro]);
+    api.atalhos().then(setAtalhos).catch(() => undefined);
+    recarregarEspera();
+  }, [caixaId, erro, recarregarEspera]);
 
   const executar = useCallback(
     async (acao: () => Promise<Venda>, aoConcluir?: (v: Venda) => void) => {
@@ -58,7 +66,7 @@ export default function PaginaPdv() {
 
   /** Garante uma venda aberta (cria na primeira leitura). */
   const vendaAtual = useCallback(async () => {
-    if (venda && venda.status === 'ABERTA') return venda;
+    if (venda && venda.status === 'ABERTA' && !venda.emEspera) return venda;
     try {
       const nova = await api.iniciarVenda();
       setVenda(nova);
@@ -79,30 +87,43 @@ export default function PaginaPdv() {
   }, [venda, erro]);
 
   const lancar = useCallback(
-    async (entrada: { codigo?: string; produtoId?: number; quantidade: number }) => {
+    async (entrada: { codigo?: string; produtoId?: number; quantidade?: number }) => {
       const v = await vendaAtual();
       if (!v) return false;
+      const antes = new Map(v.itens.map((i) => [i.id, i.quantidade]));
       const resultado = await executar(() =>
         entrada.produtoId
-          ? api.adicionarProduto(v.id, entrada.produtoId, entrada.quantidade)
+          ? api.adicionarProduto(v.id, entrada.produtoId, entrada.quantidade ?? 1)
           : api.adicionarItem(v.id, entrada.codigo!, entrada.quantidade),
       );
       if (resultado) {
-        const item = resultado.itens.find((i) =>
-          entrada.produtoId ? i.produtoId === entrada.produtoId : i.codigo === entrada.codigo,
-        ) ?? resultado.itens[resultado.itens.length - 1];
-        setUltimoItem(item?.id ?? null);
-        setSelecionado(resultado.itens.findIndex((i) => i.id === item?.id));
+        const mudou = resultado.itens.find((i) => antes.get(i.id) !== i.quantidade) ?? resultado.itens.at(-1);
+        setUltimoItem(mudou?.id ?? null);
+        setSelecionado(resultado.itens.findIndex((i) => i.id === mudou?.id));
       }
       return !!resultado;
     },
     [vendaAtual, executar],
   );
 
-  const podeReceber = !!venda && venda.status === 'ABERTA' && venda.itens.length > 0;
+  const vendaAberta = !!venda && venda.status === 'ABERTA' && !venda.emEspera;
+  const podeReceber = vendaAberta && venda!.itens.length > 0;
+
+  const abrirPainel = (p: Painel) => {
+    if (p && p !== 'consulta' && p !== 'espera' && !podeReceber) {
+      return avisar('Passe ao menos um produto primeiro.', 'info');
+    }
+    setPainel(p);
+  };
+
+  const fecharPainel = () => {
+    setPainel(null);
+    if (modo === 'itens') focarLeitor();
+  };
 
   const irParaPagamento = () => {
     if (!podeReceber) return avisar('Passe ao menos um produto antes de receber.', 'info');
+    setPainel(null);
     setModo('pagamento');
   };
 
@@ -113,56 +134,43 @@ export default function PaginaPdv() {
     setModo('concluida');
     v.avisos.forEach((a) => avisar(a, 'info'));
     recarregar();
-    if (v.notaFiscal?.status === 'AUTORIZADA') {
-      api.danfe(v.notaFiscal.id).then(setDanfe).catch(erro);
-    }
+    if (v.notaFiscal?.status === 'AUTORIZADA') api.danfe(v.notaFiscal.id).then(setDanfe).catch(erro);
   };
 
   const novaVenda = () => {
     setVenda(null);
     setDanfe(null);
     setModo('itens');
+    setPainel(null);
     setSelecionado(-1);
     setUltimoItem(null);
+    recarregarEspera();
     focarLeitor();
-  };
-
-  const cancelarVenda = async (motivo: string) => {
-    if (!venda) return;
-    const v = await executar(() => api.cancelarVenda(venda.id, motivo || undefined));
-    if (v) {
-      avisar(`Venda #${v.id} cancelada.`, 'info');
-      setConfirmarCancelamento(false);
-      novaVenda();
-    }
   };
 
   const alterarQtd = (indice: number, delta: number) => {
     if (!venda || modo !== 'itens') return;
     const item = venda.itens[indice];
-    if (!item) return;
-    const nova = item.quantidade + delta;
-    if (nova <= 0) return;
-    executar(() => api.alterarQuantidade(venda.id, item.id, nova));
+    if (!item || item.quantidade + delta <= 0) return;
+    executar(() => api.alterarQuantidade(venda.id, item.id, item.quantidade + delta));
   };
 
   const removerSelecionado = () => {
     if (!venda || modo !== 'itens') return;
     const item = venda.itens[selecionado];
-    if (!item) return;
-    executar(
-      () => api.removerItem(venda.id, item.id),
-      (v) => setSelecionado(Math.min(selecionado, v.itens.length - 1)),
-    );
+    if (item) executar(() => api.removerItem(venda.id, item.id), (v) => setSelecionado(Math.min(selecionado, v.itens.length - 1)));
   };
 
-  const livre = !confirmarCancelamento && !editandoCpf;
   useAtalhos(
     {
       F2: focarLeitor,
-      F3: () => podeReceber && setEditandoCpf(true),
+      F3: () => abrirPainel('cpf'),
       F4: () => (modo === 'itens' ? irParaPagamento() : undefined),
-      F8: () => venda?.status === 'ABERTA' && setConfirmarCancelamento(true),
+      F5: () => abrirPainel('cliente'),
+      F6: () => abrirPainel('desconto'),
+      F7: () => setPainel('espera'),
+      F8: () => vendaAberta && setPainel('cancelar'),
+      F9: () => setPainel('consulta'),
       F10: () => (modo === 'pagamento' ? finalizar() : undefined),
       Escape: () => {
         if (modo === 'pagamento') {
@@ -171,53 +179,70 @@ export default function PaginaPdv() {
         }
       },
       ArrowUp: () => modo === 'itens' && venda && setSelecionado((s) => Math.max(0, s - 1)),
-      ArrowDown: () =>
-        modo === 'itens' && venda && setSelecionado((s) => Math.min(venda.itens.length - 1, s + 1)),
+      ArrowDown: () => modo === 'itens' && venda && setSelecionado((s) => Math.min(venda.itens.length - 1, s + 1)),
       Delete: removerSelecionado,
       '+': () => alterarQtd(selecionado, 1),
       '-': () => alterarQtd(selecionado, -1),
     },
-    !!caixa && livre && modo !== 'concluida',
+    !!caixa && painel === null && modo !== 'concluida',
   );
 
-  // Na tela de venda concluída, Enter começa outra e P imprime o DANFE.
-  useAtalhos(
-    {
-      Enter: novaVenda,
-      p: () => danfe && window.print(),
-      P: () => danfe && window.print(),
-    },
-    modo === 'concluida',
-  );
+  useAtalhos({ Enter: novaVenda, p: () => danfe && window.print(), P: () => danfe && window.print() }, modo === 'concluida');
 
-  if (carregando) return <div className="pdv pdv--vazio" />;
+  if (carregando) return <div className="pdv" />;
   if (!caixa) return <CaixaFechado />;
 
-  const itens = venda?.status === 'ABERTA' || modo === 'concluida' ? venda?.itens ?? [] : [];
+  const itens = vendaAberta || modo !== 'itens' ? (venda?.itens ?? []) : [];
+  const mostrarAtalhos = modo === 'itens' && atalhos.length > 0;
 
   return (
     <div className="pdv">
+      <header className="pdv__topo">
+        <div className="pdv__topo-info">
+          <span className="pdv__venda">{vendaAberta || modo !== 'itens' ? `Venda #${venda!.id}` : 'Nova venda'}</span>
+          <span>Operador: {operador?.nome}</span>
+          {venda?.cliente && (
+            <button className="chip chip--cliente" onClick={() => abrirPainel('cliente')} disabled={modo !== 'itens'}>
+              {venda.cliente.nome}
+            </button>
+          )}
+          {!venda?.cliente && venda?.documentoConsumidor && <span className="chip">CPF {documento(venda.documentoConsumidor)}</span>}
+        </div>
+        <div className="pdv__topo-acoes">
+          {emEspera.length > 0 && (
+            <button className="chip chip--espera" onClick={() => setPainel('espera')}>
+              {emEspera.length} em espera <kbd>F7</kbd>
+            </button>
+          )}
+          <button className="chip" onClick={() => setPainel('consulta')}>
+            Consultar preço <kbd>F9</kbd>
+          </button>
+        </div>
+      </header>
+
+      {caixa.alertaSangriaLimite && (
+        <div className="faixa faixa--alerta pdv__faixa">
+          A gaveta passou de {moeda(caixa.alertaSangriaLimite)}. Faça uma sangria para guardar o excesso no cofre.{' '}
+          <Link to="/caixa">Ir para o caixa →</Link>
+        </div>
+      )}
+
       <section className="pdv__fita">
-        {modo === 'itens' && <Leitor ref={leitorRef} ocupado={ocupado} aoLancar={lancar} />}
+        {modo === 'itens' && <Leitor ref={leitor} ocupado={ocupado} aoLancar={lancar} />}
 
         <div className="cupom" aria-label="Itens da venda">
-          <header className="cupom__topo">
-            <span>{venda ? `Venda #${venda.id}` : 'Nova venda'}</span>
-            <span>{itens.length ? `${itens.length} ${itens.length === 1 ? 'item' : 'itens'}` : ''}</span>
-          </header>
-
           {itens.length === 0 ? (
             <div className="cupom__vazio">
               <p className="cupom__vazio-titulo">Passe o primeiro produto no leitor.</p>
               <ul>
                 <li>
-                  <kbd>3*</kbd> antes do código lança 3 unidades
+                  <kbd>3*</kbd> antes do código lança 3 unidades · <kbd>0,350*</kbd> lança 350 g
                 </li>
-                <li>Digite parte do nome para buscar</li>
+                <li>Etiqueta da balança e parte do nome também funcionam</li>
                 <li>
                   <kbd>↑</kbd>
-                  <kbd>↓</kbd> escolhem a linha, <kbd>+</kbd>
-                  <kbd>−</kbd> mudam a quantidade, <kbd>Del</kbd> remove
+                  <kbd>↓</kbd> escolhem a linha · <kbd>+</kbd>
+                  <kbd>−</kbd> mudam a quantidade · <kbd>Del</kbd> remove
                 </li>
               </ul>
             </div>
@@ -226,28 +251,23 @@ export default function PaginaPdv() {
               {itens.map((item, i) => (
                 <li
                   key={item.id}
-                  className={[
-                    'linha',
-                    i === selecionado && modo === 'itens' ? 'linha--selecionada' : '',
-                    item.id === ultimoItem ? 'linha--nova' : '',
-                  ].join(' ')}
+                  className={['linha', i === selecionado && modo === 'itens' ? 'linha--selecionada' : '', item.id === ultimoItem ? 'linha--nova' : ''].join(' ')}
                   onClick={() => setSelecionado(i)}
                 >
                   <span className="linha__n">{String(i + 1).padStart(3, '0')}</span>
                   <span className="linha__desc">
                     {item.descricao}
+                    {item.promocional && <em className="selo selo--oferta">oferta</em>}
                     <small>
                       {qtd(item.quantidade)} {item.unidade} × {moeda(item.precoUnitario)}
+                      {item.promocional && <s> {moeda(item.precoNormal)}</s>}
                       {item.estoqueDisponivel < item.quantidade && modo !== 'concluida' && (
                         <em className="linha__alerta"> · estoque {qtd(item.estoqueDisponivel)}</em>
                       )}
                     </small>
                   </span>
                   {modo === 'itens' ? (
-                    <QuantidadeEditavel
-                      valor={item.quantidade}
-                      aoMudar={(q) => executar(() => api.alterarQuantidade(venda!.id, item.id, q))}
-                    />
+                    <QuantidadeEditavel valor={item.quantidade} aoMudar={(q) => executar(() => api.alterarQuantidade(venda!.id, item.id, q))} />
                   ) : (
                     <span className="linha__qtd">{qtd(item.quantidade)}</span>
                   )}
@@ -268,57 +288,147 @@ export default function PaginaPdv() {
               ))}
             </ol>
           )}
+          {venda && venda.desconto > 0 && itens.length > 0 && (
+            <div className="cupom__desconto">
+              <span>Subtotal {moeda(venda.subtotal)}</span>
+              <span>
+                Desconto {venda.descontoPercentual ? `${numero(venda.descontoPercentual)}%` : ''} −{moeda(venda.desconto)}
+              </span>
+            </div>
+          )}
           <div className="cupom__serrilha" aria-hidden />
         </div>
+
+        {mostrarAtalhos && (
+          <div className="atalhos" aria-label="Produtos de acesso rápido">
+            {atalhos.map((p) => (
+              <button
+                key={p.id}
+                className="atalho"
+                style={p.categoriaCor ? ({ '--cat': p.categoriaCor } as React.CSSProperties) : undefined}
+                onClick={() => {
+                  if (p.unidade === 'KG') leitor.current?.preencher(`*${p.codigoInterno ?? p.gtin ?? ''}`, true);
+                  else lancar({ produtoId: p.id, quantidade: 1 });
+                }}
+              >
+                <strong>{p.nome}</strong>
+                <span>
+                  {moeda(p.precoVigente)}
+                  {p.unidade === 'KG' ? '/kg' : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section className="pdv__lado">
-        <Etiqueta total={venda?.total ?? 0} rotulo={modo === 'concluida' ? 'Total pago' : 'Total'} />
+        <Etiqueta total={venda && itens.length ? venda.total : 0} rotulo={modo === 'concluida' ? 'Total pago' : 'Total'} quantidade={itens.length} />
 
-        {confirmarCancelamento && venda && (
+        {painel === 'cancelar' && venda && (
           <ConfirmarCancelamento
             vendaId={venda.id}
-            aoConfirmar={cancelarVenda}
-            aoVoltar={() => {
-              setConfirmarCancelamento(false);
-              focarLeitor();
+            aoConfirmar={async (motivo) => {
+              const v = await executar(() => api.cancelarVenda(venda.id, motivo || undefined));
+              if (v) {
+                avisar(`Venda #${v.id} cancelada.`, 'info');
+                novaVenda();
+              }
             }}
+            aoVoltar={fecharPainel}
           />
         )}
-
-        {editandoCpf && venda && (
+        {painel === 'cpf' && venda && (
           <CampoCpf
             atual={venda.documentoConsumidor}
             aoSalvar={async (doc) => {
-              const v = await executar(() => api.consumidor(venda.id, doc));
-              if (v) setEditandoCpf(false);
+              if (await executar(() => api.consumidor(venda.id, doc))) fecharPainel();
             }}
-            aoVoltar={() => setEditandoCpf(false)}
+            aoVoltar={fecharPainel}
+          />
+        )}
+        {painel === 'cliente' && venda && (
+          <PainelCliente
+            atual={venda.cliente}
+            aoEscolher={async (id) => {
+              if (await executar(() => api.vincularCliente(venda.id, id))) fecharPainel();
+            }}
+            aoVoltar={fecharPainel}
+          />
+        )}
+        {painel === 'desconto' && venda && (
+          <PainelDesconto
+            venda={venda}
+            aoAplicar={async (valor, percentual) => {
+              if (await executar(() => api.desconto(venda.id, valor, percentual))) fecharPainel();
+            }}
+            aoVoltar={fecharPainel}
+          />
+        )}
+        {painel === 'espera' && (
+          <PainelEspera
+            vendaAtual={podeReceber ? venda : null}
+            emEspera={emEspera}
+            aoEstacionar={async (ident) => {
+              const v = await executar(() => api.espera(venda!.id, ident || undefined));
+              if (v) {
+                avisar(`Venda #${v.id} em espera.`, 'info');
+                novaVenda();
+              }
+            }}
+            aoRetomar={async (id) => {
+              const v = await executar(() => api.retomar(id));
+              if (v) {
+                setModo('itens');
+                setDanfe(null);
+                recarregarEspera();
+                fecharPainel();
+              }
+            }}
+            aoVoltar={fecharPainel}
+          />
+        )}
+        {painel === 'consulta' && (
+          <PainelConsulta
+            aoLancar={async (p) => {
+              fecharPainel();
+              if (modo === 'itens') await lancar({ produtoId: p.id, quantidade: 1 });
+            }}
+            aoVoltar={fecharPainel}
           />
         )}
 
-        {!confirmarCancelamento && !editandoCpf && modo === 'itens' && (
+        {painel === null && modo === 'itens' && (
           <div className="acoes">
             <button className="botao botao--principal botao--grande" disabled={!podeReceber} onClick={irParaPagamento}>
               Receber <kbd>F4</kbd>
             </button>
-            <div className="acoes__secundarias">
-              <button className="botao botao--fantasma" disabled={!podeReceber} onClick={() => setEditandoCpf(true)}>
-                {venda?.documentoConsumidor ? `CPF ${documento(venda.documentoConsumidor)}` : 'CPF na nota'}{' '}
+            <div className="acoes__grade">
+              <button className="acao" disabled={!podeReceber} onClick={() => abrirPainel('cliente')}>
+                <span>{venda?.cliente ? 'Trocar cliente' : 'Cliente'}</span>
+                <kbd>F5</kbd>
+              </button>
+              <button className="acao" disabled={!podeReceber} onClick={() => abrirPainel('desconto')}>
+                <span>{venda?.desconto ? `Desconto ${moeda(venda.desconto)}` : 'Desconto'}</span>
+                <kbd>F6</kbd>
+              </button>
+              <button className="acao" disabled={!podeReceber} onClick={() => abrirPainel('cpf')}>
+                <span>{venda?.documentoConsumidor ? 'CPF informado' : 'CPF na nota'}</span>
                 <kbd>F3</kbd>
               </button>
-              <button
-                className="botao botao--fantasma botao--perigo"
-                disabled={venda?.status !== 'ABERTA'}
-                onClick={() => setConfirmarCancelamento(true)}
-              >
-                Cancelar venda <kbd>F8</kbd>
+              <button className="acao" onClick={() => setPainel('espera')}>
+                <span>Espera</span>
+                <kbd>F7</kbd>
+              </button>
+              <button className="acao acao--perigo" disabled={!vendaAberta} onClick={() => setPainel('cancelar')}>
+                <span>Cancelar venda</span>
+                <kbd>F8</kbd>
               </button>
             </div>
           </div>
         )}
 
-        {!confirmarCancelamento && !editandoCpf && modo === 'pagamento' && venda && (
+        {painel === null && modo === 'pagamento' && venda && (
           <Pagamento
             venda={venda}
             ocupado={ocupado}
@@ -343,13 +453,13 @@ export default function PaginaPdv() {
               <p className="concluida__ok">Venda #{venda.id} finalizada.</p>
             )}
             <NotaStatus venda={venda} />
-            <div className="acoes__secundarias">
+            <div className="acoes__linha">
               <button className="botao botao--principal" onClick={novaVenda} autoFocus>
                 Nova venda <kbd>Enter</kbd>
               </button>
               {danfe && (
                 <button className="botao botao--fantasma" onClick={() => window.print()}>
-                  Imprimir DANFE <kbd>P</kbd>
+                  Imprimir cupom <kbd>P</kbd>
                 </button>
               )}
             </div>
@@ -375,19 +485,22 @@ function CaixaFechado() {
         <h1>Abra o caixa para começar a vender.</h1>
         <p>Informe o dinheiro que está na gaveta (fundo de troco) e o PDV fica pronto para o leitor.</p>
         <Link className="botao botao--principal botao--grande" to="/caixa">
-          Abrir caixa <kbd>F6</kbd>
+          Abrir caixa
         </Link>
       </div>
     </div>
   );
 }
 
-function Etiqueta({ total, rotulo }: { total: number; rotulo: string }) {
+function Etiqueta({ total, rotulo, quantidade }: { total: number; rotulo: string; quantidade: number }) {
   const [inteiro, centavos] = numero(total).split(',');
   return (
     <div className="etiqueta" aria-label={`${rotulo}: ${moeda(total)}`}>
       <span className="etiqueta__furo" aria-hidden />
-      <span className="etiqueta__rotulo">{rotulo}</span>
+      <span className="etiqueta__rotulo">
+        {rotulo}
+        {quantidade > 0 && <span> · {quantidade} {quantidade === 1 ? 'item' : 'itens'}</span>}
+      </span>
       <span className="etiqueta__valor" key={total}>
         <small>R$</small>
         {inteiro}
@@ -397,18 +510,42 @@ function Etiqueta({ total, rotulo }: { total: number; rotulo: string }) {
   );
 }
 
+function NotaStatus({ venda }: { venda: Venda }) {
+  const nota = venda.notaFiscal;
+  if (!nota) return <p className="nota-status">Sem NFC-e para esta venda.</p>;
+  return (
+    <p className={`nota-status nota-status--${nota.status.toLowerCase()}`}>
+      NFC-e nº {nota.numero} · {nota.status.toLowerCase()}
+      {nota.ambiente === 'HOMOLOGACAO' && ' · homologação'}
+      {nota.status !== 'AUTORIZADA' && nota.motivo && <small>{nota.motivo}</small>}
+    </p>
+  );
+}
+
 // ------------------------------------------------------------------------- Leitor de códigos
 
 const Leitor = forwardRef<
-  HTMLInputElement,
-  { ocupado: boolean; aoLancar: (e: { codigo?: string; produtoId?: number; quantidade: number }) => Promise<boolean> }
+  LeitorHandle,
+  { ocupado: boolean; aoLancar: (e: { codigo?: string; produtoId?: number; quantidade?: number }) => Promise<boolean> }
 >(function Leitor({ ocupado, aoLancar }, ref) {
   const [texto, setTexto] = useState('');
   const [sugestoes, setSugestoes] = useState<Produto[]>([]);
   const [indice, setIndice] = useState(0);
+  const campo = useRef<HTMLInputElement>(null);
   const { erro } = useAvisos();
 
-  const { quantidade, termo } = interpretar(texto);
+  useImperativeHandle(ref, () => ({
+    focar: () => campo.current?.focus(),
+    preencher: (t, cursorNoInicio) => {
+      setTexto(t);
+      setTimeout(() => {
+        campo.current?.focus();
+        if (cursorNoInicio) campo.current?.setSelectionRange(0, 0);
+      }, 0);
+    },
+  }));
+
+  const { quantidade, termo, explicita } = interpretar(texto);
   const ehBusca = termo.length >= 2 && !/^\d+$/.test(termo);
 
   useEffect(() => {
@@ -424,16 +561,17 @@ const Leitor = forwardRef<
           setIndice(0);
         })
         .catch(() => setSugestoes([]));
-    }, 180);
+    }, 160);
     return () => clearTimeout(t);
   }, [termo, ehBusca]);
 
   const lancar = async (entrada: { codigo?: string; produtoId?: number }) => {
-    if (!Number.isFinite(quantidade) || quantidade <= 0) {
-      erro(new ApiError(422, 'QUANTIDADE_INVALIDA', 'Quantidade inválida.'));
+    if (explicita && (!Number.isFinite(quantidade) || quantidade <= 0)) {
+      erro(new ApiError(422, 'QUANTIDADE_INVALIDA', 'Digite a quantidade antes do * (ex.: 0,350*015).'));
       return;
     }
-    const ok = await aoLancar({ ...entrada, quantidade });
+    // Sem quantidade digitada, o servidor decide (1, ou o peso/preço da etiqueta de balança).
+    const ok = await aoLancar({ ...entrada, quantidade: explicita ? quantidade : undefined });
     if (ok) {
       setTexto('');
       setSugestoes([]);
@@ -452,9 +590,12 @@ const Leitor = forwardRef<
         Código de barras, código ou nome <kbd>F2</kbd>
       </label>
       <div className="leitor__campo">
+        <svg className="leitor__icone" viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
+          <path d="M3 5v14M6 5v14M10 5v14M13 5v14M17 5v14M21 5v14" />
+        </svg>
         <input
           id="leitor"
-          ref={ref}
+          ref={campo}
           autoFocus
           autoComplete="off"
           spellCheck={false}
@@ -480,9 +621,7 @@ const Leitor = forwardRef<
             }
           }}
         />
-        {quantidade !== 1 && Number.isFinite(quantidade) && termo && (
-          <span className="leitor__qtd">× {qtd(quantidade)}</span>
-        )}
+        {explicita && Number.isFinite(quantidade) && <span className="leitor__qtd">× {qtd(quantidade)}</span>}
       </div>
       {sugestoes.length > 0 && (
         <ul className="sugestoes" role="listbox">
@@ -497,9 +636,13 @@ const Leitor = forwardRef<
                 lancar({ produtoId: p.id });
               }}
             >
-              <span>{p.nome}</span>
+              <span>
+                {p.nome}
+                {p.emPromocao && <em className="selo selo--oferta">oferta</em>}
+              </span>
               <small>{p.gtin ?? p.codigoInterno}</small>
-              <strong>{moeda(p.preco)}</strong>
+              <small>{qtd(p.estoqueAtual)} {p.unidade}</small>
+              <strong>{moeda(p.precoVigente)}</strong>
             </li>
           ))}
         </ul>
@@ -510,9 +653,9 @@ const Leitor = forwardRef<
 
 /** "3*789..." → 3 unidades; "0,350*015" → 0,350 kg. */
 function interpretar(texto: string) {
-  const m = texto.trim().match(/^(\d+(?:[.,]\d+)?)\s*\*\s*(.*)$/);
-  if (m) return { quantidade: parseValor(m[1]), termo: m[2].trim() };
-  return { quantidade: 1, termo: texto.trim() };
+  const m = texto.trim().match(/^(\d*(?:[.,]\d+)?)\s*\*\s*(.*)$/);
+  if (m) return { quantidade: parseValor(m[1]), termo: m[2].trim(), explicita: true };
+  return { quantidade: 1, termo: texto.trim(), explicita: false };
 }
 
 function QuantidadeEditavel({ valor, aoMudar }: { valor: number; aoMudar: (q: number) => void }) {
@@ -553,237 +696,5 @@ function QuantidadeEditavel({ valor, aoMudar }: { valor: number; aoMudar: (q: nu
       }}
       aria-label="Nova quantidade"
     />
-  );
-}
-
-// ------------------------------------------------------------------------------- Pagamento
-
-function Pagamento({
-  venda,
-  ocupado,
-  aoPagar,
-  aoRemover,
-  aoFinalizar,
-  aoVoltar,
-}: {
-  venda: Venda;
-  ocupado: boolean;
-  aoPagar: (f: FormaPagamento, v: number) => Promise<Venda | null>;
-  aoRemover: (id: number) => void;
-  aoFinalizar: () => void;
-  aoVoltar: () => void;
-}) {
-  const [forma, setForma] = useState<FormaPagamento>('DINHEIRO');
-  const [valor, setValor] = useState('');
-  const campo = useRef<HTMLInputElement>(null);
-  const quitada = venda.restante <= 0;
-
-  useEffect(() => {
-    setValor(venda.restante > 0 ? numero(venda.restante) : '');
-    setTimeout(() => campo.current?.select(), 0);
-  }, [venda.restante, forma]);
-
-  const escolher = (f: FormaPagamento) => {
-    setForma(f);
-    campo.current?.focus();
-  };
-
-  const lancar = async () => {
-    const v = parseValor(valor);
-    if (!Number.isFinite(v) || v <= 0) return;
-    await aoPagar(forma, v);
-  };
-
-  // Atalhos de valor rápido para dinheiro: notas comuns acima do restante.
-  const notas = [5, 10, 20, 50, 100, 200].filter((n) => n > venda.restante).slice(0, 3);
-
-  return (
-    <div className="pagamento">
-      <div className="pagamento__resumo">
-        <div>
-          <span>Pago</span>
-          <strong>{moeda(venda.valorPago)}</strong>
-        </div>
-        <div className={quitada ? 'pagamento__ok' : 'pagamento__falta'}>
-          <span>{quitada ? 'Quitado' : 'Falta'}</span>
-          <strong>{moeda(venda.restante)}</strong>
-        </div>
-      </div>
-
-      {venda.troco > 0 && (
-        <div className="troco" aria-live="polite">
-          <span>Troco</span>
-          <strong>{moeda(venda.troco)}</strong>
-        </div>
-      )}
-
-      {!quitada && (
-        <>
-          <div className="formas" role="radiogroup" aria-label="Forma de pagamento">
-            {FORMAS.map(({ forma: f, tecla }) => (
-              <button
-                key={f}
-                role="radio"
-                aria-checked={forma === f}
-                className={`forma ${forma === f ? 'forma--ativa' : ''}`}
-                onClick={() => escolher(f)}
-              >
-                <kbd>{tecla}</kbd>
-                {nomeForma[f]}
-              </button>
-            ))}
-          </div>
-          <form
-            className="pagamento__valor"
-            onSubmit={(e) => {
-              e.preventDefault();
-              lancar();
-            }}
-          >
-            <label htmlFor="valor-pagamento">Valor em {nomeForma[forma].toLowerCase()}</label>
-            <div className="campo-moeda">
-              <span>R$</span>
-              <input
-                id="valor-pagamento"
-                ref={campo}
-                inputMode="decimal"
-                autoFocus
-                value={valor}
-                onChange={(e) => setValor(e.target.value)}
-                onKeyDown={(e) => {
-                  // Letras nunca fazem parte de um valor, então trocam a forma sem atrapalhar a digitação.
-                  const f = FORMAS.find((x) => x.tecla === e.key.toUpperCase());
-                  if (f && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                    e.preventDefault();
-                    escolher(f.forma);
-                  }
-                }}
-              />
-              <button className="botao botao--principal" disabled={ocupado}>
-                Lançar <kbd>Enter</kbd>
-              </button>
-            </div>
-            {forma === 'DINHEIRO' && notas.length > 0 && (
-              <div className="notas">
-                {notas.map((n) => (
-                  <button type="button" key={n} className="nota" onClick={() => aoPagar('DINHEIRO', n)}>
-                    {moeda(n)}
-                  </button>
-                ))}
-              </div>
-            )}
-            <p className="dica">D dinheiro · P PIX · B débito · C crédito. Só dinheiro gera troco.</p>
-          </form>
-        </>
-      )}
-
-      {venda.pagamentos.length > 0 && (
-        <ul className="pagamentos">
-          {venda.pagamentos.map((p) => (
-            <li key={p.id}>
-              <span>{nomeForma[p.forma]}</span>
-              <strong>{moeda(p.valor)}</strong>
-              <button aria-label={`Remover pagamento de ${moeda(p.valor)}`} onClick={() => aoRemover(p.id)}>
-                ×
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-
-      <div className="acoes__secundarias">
-        <button className="botao botao--confirmar botao--grande" disabled={!quitada || ocupado} onClick={aoFinalizar}>
-          Finalizar <kbd>F10</kbd>
-        </button>
-        <button className="botao botao--fantasma" onClick={aoVoltar}>
-          Voltar aos itens <kbd>Esc</kbd>
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function NotaStatus({ venda }: { venda: Venda }) {
-  const nota = venda.notaFiscal;
-  if (!nota) return <p className="nota-status">Sem NFC-e para esta venda.</p>;
-  return (
-    <p className={`nota-status nota-status--${nota.status.toLowerCase()}`}>
-      NFC-e nº {nota.numero} · {nota.status.toLowerCase()}
-      {nota.ambiente === 'HOMOLOGACAO' && ' · homologação'}
-      {nota.status !== 'AUTORIZADA' && nota.motivo && <small>{nota.motivo}</small>}
-    </p>
-  );
-}
-
-function ConfirmarCancelamento({
-  vendaId,
-  aoConfirmar,
-  aoVoltar,
-}: {
-  vendaId: number;
-  aoConfirmar: (motivo: string) => void;
-  aoVoltar: () => void;
-}) {
-  const [motivo, setMotivo] = useState('');
-  return (
-    <form
-      className="confirmacao"
-      onSubmit={(e) => {
-        e.preventDefault();
-        aoConfirmar(motivo);
-      }}
-      onKeyDown={(e) => e.key === 'Escape' && aoVoltar()}
-    >
-      <p>
-        Cancelar a venda <strong>#{vendaId}</strong>? Os itens e pagamentos lançados são descartados.
-      </p>
-      <input autoFocus placeholder="Motivo (opcional)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
-      <div className="acoes__secundarias">
-        <button className="botao botao--perigo-cheio">
-          Cancelar venda <kbd>Enter</kbd>
-        </button>
-        <button type="button" className="botao botao--fantasma" onClick={aoVoltar}>
-          Voltar <kbd>Esc</kbd>
-        </button>
-      </div>
-    </form>
-  );
-}
-
-function CampoCpf({
-  atual,
-  aoSalvar,
-  aoVoltar,
-}: {
-  atual?: string;
-  aoSalvar: (doc: string) => void;
-  aoVoltar: () => void;
-}) {
-  const [doc, setDoc] = useState(atual ? documento(atual) : '');
-  return (
-    <form
-      className="confirmacao confirmacao--neutra"
-      onSubmit={(e) => {
-        e.preventDefault();
-        aoSalvar(doc);
-      }}
-      onKeyDown={(e) => e.key === 'Escape' && aoVoltar()}
-    >
-      <label htmlFor="cpf">CPF ou CNPJ na nota</label>
-      <input id="cpf" autoFocus inputMode="numeric" placeholder="000.000.000-00" value={doc} onChange={(e) => setDoc(e.target.value)} />
-      <div className="acoes__secundarias">
-        <button className="botao botao--principal">
-          Salvar <kbd>Enter</kbd>
-        </button>
-        <button type="button" className="botao botao--fantasma" onClick={aoVoltar}>
-          Voltar <kbd>Esc</kbd>
-        </button>
-        {atual && (
-          <button type="button" className="botao botao--fantasma" onClick={() => aoSalvar('')}>
-            Remover
-          </button>
-        )}
-      </div>
-    </form>
   );
 }

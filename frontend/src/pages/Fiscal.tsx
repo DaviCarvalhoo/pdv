@@ -145,9 +145,9 @@ function Notas() {
                     DANFE
                   </button>
                 )}
-                <a className="link" href={api.xmlUrl(n.id)} download>
+                <button className="link" onClick={() => api.baixarXml(n.id, n.chaveAcesso).catch(erro)}>
                   XML
-                </a>
+                </button>
                 {n.status === 'AUTORIZADA' && (
                   <button className="link link--perigo" onClick={() => setCancelando(n)}>
                     Cancelar

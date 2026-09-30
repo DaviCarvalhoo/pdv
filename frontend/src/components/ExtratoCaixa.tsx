@@ -5,6 +5,7 @@ const NOME_MOV = {
   SUPRIMENTO: 'Suprimento',
   SANGRIA: 'Sangria',
   VENDA_DINHEIRO: 'Venda em dinheiro',
+  RECEBIMENTO_CLIENTE: 'Fiado recebido',
   ESTORNO_VENDA: 'Estorno de venda',
 } as const;
 
@@ -33,6 +34,12 @@ export default function ExtratoCaixa({ e }: { e: Extrato }) {
             <dd>{moeda(e.suprimentos)}</dd>
             <dt>+ Vendas em dinheiro</dt>
             <dd>{moeda(e.vendasDinheiro)}</dd>
+            {e.recebimentosClientes > 0 && (
+              <>
+                <dt>+ Fiado recebido</dt>
+                <dd>{moeda(e.recebimentosClientes)}</dd>
+              </>
+            )}
             <dt>− Sangrias</dt>
             <dd>{moeda(e.sangrias)}</dd>
             <dt>− Estornos</dt>

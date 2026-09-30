@@ -8,6 +8,7 @@ export default function Danfe({ d }: { d: DanfeDados }) {
   return (
     <article className="danfe" aria-label={`DANFE NFC-e número ${d.numero}`}>
       <header className="danfe__topo">
+        {d.logo && <img className="danfe__logo" src={d.logo} alt="" />}
         <strong>{d.emitente.nomeFantasia || d.emitente.razaoSocial}</strong>
         <span>{d.emitente.razaoSocial}</span>
         <span>
@@ -51,6 +52,14 @@ export default function Danfe({ d }: { d: DanfeDados }) {
       <dl className="danfe__totais">
         <dt>Qtd. total de itens</dt>
         <dd>{d.quantidadeItens}</dd>
+        {d.desconto > 0 && (
+          <>
+            <dt>Valor total R$</dt>
+            <dd>{numero(d.subtotal)}</dd>
+            <dt>Desconto R$</dt>
+            <dd>-{numero(d.desconto)}</dd>
+          </>
+        )}
         <dt className="danfe__forte">Valor a pagar R$</dt>
         <dd className="danfe__forte">{numero(d.valorTotal)}</dd>
         <dt>Forma de pagamento</dt>
@@ -76,6 +85,12 @@ export default function Danfe({ d }: { d: DanfeDados }) {
         {d.consumidor ? `CONSUMIDOR · ${d.consumidor.length === 11 ? 'CPF' : 'CNPJ'} ${documento(d.consumidor)}` : 'CONSUMIDOR NÃO IDENTIFICADO'}
       </p>
 
+      {d.tributosAprox > 0 && (
+        <p className="danfe__tributos">
+          Tributos totais incidentes (Lei Federal 12.741/2012): R$ {numero(d.tributosAprox)} (fonte: IBPT)
+        </p>
+      )}
+
       <div className="danfe__rodape">
         <QRCodeSVG value={d.urlQrCode} size={132} level="M" marginSize={0} bgColor="transparent" fgColor="currentColor" />
         <div>
@@ -91,8 +106,10 @@ export default function Danfe({ d }: { d: DanfeDados }) {
             </p>
           )}
           {d.dataAutorizacao && <p>Autorização {dataHora(d.dataAutorizacao)}</p>}
+          {d.operador && <p>Operador: {d.operador}</p>}
         </div>
       </div>
+      {d.mensagemCupom && <p className="danfe__mensagem">{d.mensagemCupom}</p>}
     </article>
   );
 }

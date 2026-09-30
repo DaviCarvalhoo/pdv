@@ -2,16 +2,16 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BrowserRouter } from 'react-router-dom';
 import App from './App';
-import { AvisosProvider, CaixaProvider } from './lib/contexto';
+import { AvisosProvider, SessaoProvider } from './lib/contexto';
 import './styles.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
       <AvisosProvider>
-        <CaixaProvider>
+        <SessaoProvider>
           <App />
-        </CaixaProvider>
+        </SessaoProvider>
       </AvisosProvider>
     </BrowserRouter>
   </StrictMode>,

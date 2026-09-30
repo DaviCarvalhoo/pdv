@@ -158,7 +158,7 @@ public class DadosDemonstracao implements ApplicationRunner {
     private Produto produto(String nome, String preco, String custo, String gtin, String codigo, String unidade,
                             String ncm, Categoria categoria, int estoque, Integer minimo, boolean atalho) {
         return produtoService.cadastrar(new ProdutoRequest(nome, new BigDecimal(preco), codigo, gtin, unidade, ncm,
-                "5102", 0, "102", minimo != null ? BigDecimal.valueOf(minimo) : null, BigDecimal.valueOf(estoque),
+                "5102", 0, "102", minimo != null ? BigDecimal.valueOf(minimo) : null, BigDecimal.valueOf(estoque * 3L),
                 categoria.getId(), new BigDecimal(custo), null, null, null, atalho, null));
     }
 
