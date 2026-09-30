@@ -1105,6 +1105,7 @@ small {
 .danfe__itens td:nth-child(n + 3) {
   text-align: right;
   white-space: nowrap;
+  padding-left: 1.5mm;
 }
 
 .danfe__totais {

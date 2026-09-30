@@ -8,10 +8,10 @@ import { documento, moeda, nomeForma, numero, parseValor, qtd } from '../lib/for
 type Modo = 'itens' | 'pagamento' | 'concluida';
 
 const FORMAS: { forma: FormaPagamento; tecla: string }[] = [
-  { forma: 'DINHEIRO', tecla: '1' },
-  { forma: 'PIX', tecla: '2' },
-  { forma: 'CARTAO_DEBITO', tecla: '3' },
-  { forma: 'CARTAO_CREDITO', tecla: '4' },
+  { forma: 'DINHEIRO', tecla: 'D' },
+  { forma: 'PIX', tecla: 'P' },
+  { forma: 'CARTAO_DEBITO', tecla: 'B' },
+  { forma: 'CARTAO_CREDITO', tecla: 'C' },
 ];
 
 export default function PaginaPdv() {
@@ -30,10 +30,13 @@ export default function PaginaPdv() {
   const leitorRef = useRef<HTMLInputElement>(null);
   const focarLeitor = () => setTimeout(() => leitorRef.current?.focus(), 0);
 
+  // Retoma a venda em andamento só quando o caixa muda (não a cada atualização do saldo da gaveta,
+  // senão a tela de venda concluída seria apagada logo após finalizar).
+  const caixaId = caixa?.id;
   useEffect(() => {
-    if (!caixa) return;
+    if (!caixaId) return;
     api.vendaAberta().then((v) => setVenda(v ?? null)).catch(erro);
-  }, [caixa, erro]);
+  }, [caixaId, erro]);
 
   const executar = useCallback(
     async (acao: () => Promise<Venda>, aoConcluir?: (v: Venda) => void) => {
@@ -648,8 +651,9 @@ function Pagamento({
                 value={valor}
                 onChange={(e) => setValor(e.target.value)}
                 onKeyDown={(e) => {
-                  const f = FORMAS.find((x) => x.tecla === e.key);
-                  if (f && (e.currentTarget.selectionStart === 0 && e.currentTarget.selectionEnd === valor.length)) {
+                  // Letras nunca fazem parte de um valor, então trocam a forma sem atrapalhar a digitação.
+                  const f = FORMAS.find((x) => x.tecla === e.key.toUpperCase());
+                  if (f && !e.ctrlKey && !e.altKey && !e.metaKey) {
                     e.preventDefault();
                     escolher(f.forma);
                   }
@@ -668,7 +672,7 @@ function Pagamento({
                 ))}
               </div>
             )}
-            <p className="dica">Selecione o valor e aperte 1–4 para trocar a forma. Só dinheiro gera troco.</p>
+            <p className="dica">D dinheiro · P PIX · B débito · C crédito. Só dinheiro gera troco.</p>
           </form>
         </>
       )}
