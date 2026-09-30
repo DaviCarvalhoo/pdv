@@ -427,3 +427,80 @@ Cenário: Venda finalizada é imutável
 | **8** | NFC-e (config, chave, XML, QR Code, DANFE, cancelamento, emissor simulado + porta para o real) | 4 |
 
 **Definição de pronto (por fase):** regras cobertas por testes, endpoints com DTOs e erros padronizados, documentação OpenAPI atualizada e código revisado e mergeado na `main`.
+
+---
+
+## 12. Análise de mercado: o que faltava para competir
+
+A lista original cobre o ciclo básico da venda. Comparando com os PDVs mais usados no varejo pequeno brasileiro (mercadinhos, conveniências, padarias, lojas de bairro), estes pontos aparecem em praticamente todos. Quem não tem, perde a venda para o concorrente.
+
+| # | Recurso | Por que importa | Situação |
+|---|---|---|---|
+| M1 | **Operadores com login por PIN e perfis** (operador, gerente, admin) | Saber quem vendeu, quem cancelou, quem mexeu no caixa | ✅ Fase 9 |
+| M2 | **Autorização do gerente** (PIN do supervisor) para cancelar venda, estornar, dar desconto acima do limite e fazer sangria | Controle antifraude básico, cobrado por todo dono de loja | ✅ Fase 9 |
+| M3 | **Cadastro da loja e personalização** (nome, logo, cor, mensagem do cupom) | O sistema tem a cara da loja, no PDV e no cupom | ✅ Fase 9 |
+| M4 | **Painel de vendas (dashboard)**: faturamento do dia, ticket médio, lucro bruto, vendas por hora, formas de pagamento, mais vendidos, comparação com ontem | O dono acompanha o dia sem abrir relatório | ✅ Fase 10 |
+| M5 | **Descontos** no total (valor ou %) com limite por perfil | Negociação no balcão, com rateio correto na NFC-e | ✅ Fase 9 |
+| M6 | **Clientes e fiado (crediário)** com limite de crédito, conta corrente e recebimento | Muito usado em bairro. Sem isso, o dono volta pro caderninho | ✅ Fase 11 |
+| M7 | **Vale-alimentação e vale-refeição** como formas de pagamento | Obrigatório em mercado e padaria | ✅ Fase 9 |
+| M8 | **Etiqueta de balança** (EAN-13 começando com 2, com preço ou peso embutido) | Todo mercado com açougue, frios ou hortifrúti usa | ✅ Fase 9 |
+| M9 | **Preço promocional com vigência** | Ofertas da semana sem mexer no preço normal | ✅ Fase 9 |
+| M10 | **Preço de custo e margem** por produto | Saber quanto lucra, não só quanto vende | ✅ Fase 9 |
+| M11 | **Categorias** de produto | Organizar cadastro e relatórios | ✅ Fase 9 |
+| M12 | **Curva ABC** de produtos | Saber o que não pode faltar na prateleira | ✅ Fase 10 |
+| M13 | **Alerta de sangria** (limite de dinheiro na gaveta) | Segurança: menos dinheiro exposto | ✅ Fase 9 |
+| M14 | **Canal de sugestões** dentro do sistema | O cliente pede melhorias sem sair do PDV | ✅ Fase 12 |
+| M15 | Troca e devolução com vale-troca | Comum em loja de roupa e presentes | Backlog (P1) |
+| M16 | Orçamento / pré-venda (vendedor monta, caixa recebe) | Lojas com balcão e caixa separados | Backlog (P1) |
+| M17 | PIX com QR Code dinâmico (integração com banco/PSP) e baixa automática | Elimina conferência manual do PIX | Backlog (P1) |
+| M18 | TEF (maquininha integrada) | Elimina digitação do valor na maquininha | Backlog (P2) |
+| M19 | Entrada de mercadoria pelo XML da NF-e do fornecedor | Cadastra e dá entrada no estoque de uma vez | Backlog (P1) |
+| M20 | Impressão de etiquetas de gôndola | Preço na prateleira sempre igual ao do sistema | Backlog (P2) |
+| M21 | Modo offline (vender sem internet e sincronizar) + contingência NFC-e | Internet cai; a venda não pode parar | Backlog (P1) |
+| M22 | Tributos aproximados (Lei 12.741/IBPT) no cupom | Exigência legal no cupom | Backlog (P1) |
+| M23 | Multi-loja / multi-caixa | Crescimento do cliente | Backlog (P2) |
+| M24 | Integração com delivery (iFood etc.) e loja virtual | Canais extras | Backlog (P2) |
+
+### Fase 9 — Loja, operadores e regras da venda
+
+| ID | Requisito |
+|---|---|
+| RF-LOJ-01 | Cadastro da loja: nome, slogan, logo (PNG/JPG/SVG até 300 KB), cor de destaque, mensagem do rodapé do cupom. |
+| RF-LOJ-02 | Regras da venda: política de estoque (avisar ou bloquear), limite de dinheiro na gaveta (alerta de sangria), desconto máximo do operador (%). |
+| RF-LOJ-03 | Configuração da etiqueta de balança: prefixo, quantidade de dígitos do código e se o valor embutido é preço ou peso. |
+| RF-USU-01 | Usuários com nome, perfil (`OPERADOR`, `GERENTE`, `ADMIN`) e PIN de 4 a 6 dígitos (guardado com BCrypt). |
+| RF-USU-02 | Login por seleção do operador e PIN. Sessão por token com validade de 12 h. |
+| RF-USU-03 | Primeiro acesso: se não existir usuário, a tela pede a criação do administrador. |
+| RF-USU-04 | Ações sensíveis exigem gerente ou autorização pontual com PIN de gerente: cancelar venda, estornar, desconto acima do limite, sangria, cancelar NFC-e. |
+| RF-USU-05 | Venda, cancelamento e movimentações de caixa registram o operador. |
+| RF-DES-01 | Desconto no total da venda, em valor ou percentual, recalculado quando os itens mudam. Rateado por item no XML da NFC-e (`vDesc`). |
+| RF-PAG-10 | Formas de pagamento: vale-alimentação (`tPag 10`), vale-refeição (`tPag 11`) e crediário/fiado (`tPag 05`). |
+| RF-PRO-14 | Categoria, preço de custo e margem calculada no cadastro de produto. |
+| RF-PRO-15 | Preço promocional com data de início e fim, aplicado automaticamente na venda. |
+| RF-PRO-16 | Leitura de etiqueta de balança (EAN-13 com prefixo `2`): identifica o produto pelo código interno e calcula a quantidade pelo peso ou pelo preço embutido. |
+
+### Fase 10 — Painel e relatórios
+
+| ID | Requisito |
+|---|---|
+| RF-PAI-01 | Painel do dia: faturamento, número de vendas, ticket médio, itens vendidos, lucro bruto estimado e descontos, com comparação com o dia anterior. |
+| RF-PAI-02 | Gráfico de vendas por hora, faturamento por forma de pagamento, top 10 produtos, vendas por categoria e por operador. |
+| RF-PAI-03 | Alertas: estoque baixo, notas rejeitadas/pendentes, gaveta acima do limite, fiado a receber. |
+| RF-REL-01 | Curva ABC por período (A = 80% do faturamento, B = 15%, C = 5%). |
+
+### Fase 11 — Clientes e fiado
+
+| ID | Requisito |
+|---|---|
+| RF-CLI-01 | Cadastro de cliente: nome, CPF/CNPJ, telefone, e-mail, limite de crédito. |
+| RF-CLI-02 | Vincular cliente à venda (preenche o CPF da nota automaticamente). |
+| RF-CLI-03 | Pagamento em crediário exige cliente e respeita o limite (`saldo devedor + valor ≤ limite`). |
+| RF-CLI-04 | Conta corrente do cliente: compras, pagamentos e estornos, com saldo devedor. |
+| RF-CLI-05 | Recebimento de fiado em qualquer forma. Em dinheiro, entra no caixa como `RECEBIMENTO_CLIENTE`. |
+
+### Fase 12 — Sugestões
+
+| ID | Requisito |
+|---|---|
+| RF-SUG-01 | Qualquer usuário registra sugestões (título, descrição, área do sistema). |
+| RF-SUG-02 | Admin muda o status: `NOVA`, `EM_ANALISE`, `PLANEJADA`, `FEITA`, `DESCARTADA`, com resposta. |
