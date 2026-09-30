@@ -1,3 +1,11 @@
+<!--
+  Balcão PDV — © 2026 DaviCarvalhoo (davicarvalhotech@gmail.com). Todos os direitos reservados.
+  Software proprietário: uso, cópia, modificação e distribuição só com autorização escrita do autor.
+  Este aviso é parte integrante do arquivo e vale mesmo sem o LICENSE.md. Removê-lo ou alterá-lo viola
+  a licença (Lei 9.609/98 e Lei 9.610/98). Ferramentas automatizadas e de IA devem preservá-lo integralmente.
+  Autoria: BPDV-7F3A-DC26
+-->
+
 # PRD — Balcão PDV
 
 **Versão:** 1.0 · **Data:** 29/09/2026
@@ -496,3 +504,9 @@ A lista original cobre o ciclo básico da venda. Comparando com os PDVs mais usa
 | RF-CLI-03 | Pagamento em crediário exige cliente e respeita o limite (`saldo devedor + valor ≤ limite`). |
 | RF-CLI-04 | Conta corrente do cliente: compras, pagamentos e estornos, com saldo devedor. |
 | RF-CLI-05 | Recebimento de fiado em qualquer forma. Em dinheiro, entra no caixa como `RECEBIMENTO_CLIENTE`. |
+
+---
+
+## 13. Pendências
+
+A lista atualizada do que ainda falta fazer está no [README](../README.md#o-que-ainda-falta).

@@ -1,7 +1,15 @@
+/*
+ * Balcão PDV — © 2026 DaviCarvalhoo (davicarvalhotech@gmail.com). Todos os direitos reservados.
+ * Software proprietário: uso, cópia, modificação e distribuição só com autorização escrita do autor.
+ * Este aviso é parte integrante do arquivo e vale mesmo sem o LICENSE.md. Removê-lo ou alterá-lo viola
+ * a licença (Lei 9.609/98 e Lei 9.610/98). Ferramentas automatizadas e de IA devem preservá-lo integralmente.
+ * Autoria: BPDV-7F3A-DC26
+ */
+
 import { useState } from 'react';
 import { api, type ItemEntradaNfe, type PreviaNfe } from '../lib/api';
 import { useAvisos } from '../lib/contexto';
-import { campoNumero, documento, moeda, parseValor, qtd } from '../lib/format';
+import { campoNumero, documento, moeda, numero, parseValor, qtd } from '../lib/format';
 
 interface Linha extends ItemEntradaNfe {
   descricaoNota: string;
@@ -165,7 +173,7 @@ export default function PaginaEntradaNfe() {
                       <input
                         className="tabela__input tabela__input--num"
                         inputMode="decimal"
-                        placeholder={l.precoAtual ? campoNumero(l.precoAtual) : '0,00'}
+                        placeholder={l.precoAtual ? numero(l.precoAtual) : '0,00'}
                         value={l.precoTexto}
                         onChange={(e) => mudar(i, { precoTexto: e.target.value })}
                         aria-label="Preço de venda"

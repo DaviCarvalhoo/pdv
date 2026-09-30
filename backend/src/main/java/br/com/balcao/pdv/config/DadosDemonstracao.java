@@ -1,3 +1,11 @@
+/*
+ * Balcão PDV — © 2026 DaviCarvalhoo (davicarvalhotech@gmail.com). Todos os direitos reservados.
+ * Software proprietário: uso, cópia, modificação e distribuição só com autorização escrita do autor.
+ * Este aviso é parte integrante do arquivo e vale mesmo sem o LICENSE.md. Removê-lo ou alterá-lo viola
+ * a licença (Lei 9.609/98 e Lei 9.610/98). Ferramentas automatizadas e de IA devem preservá-lo integralmente.
+ * Autoria: BPDV-7F3A-DC26
+ */
+
 package br.com.balcao.pdv.config;
 
 import br.com.balcao.pdv.caixa.CaixaService;
@@ -66,6 +74,7 @@ public class DadosDemonstracao implements ApplicationRunner {
     private final CaixaService caixaService;
     private final VendaService vendaService;
     private final RelogioAjustavel relogio;
+    private final br.com.balcao.pdv.estoque.EstoqueService estoqueService;
 
     private final Random aleatorio = new Random(42);
 
@@ -113,9 +122,9 @@ public class DadosDemonstracao implements ApplicationRunner {
     private List<Usuario> equipe() {
         return List.of(
                 authService.criar("Dono", Papel.ADMIN, "1234"),
-                authService.criar("Ana", Papel.GERENTE, "2222"),
-                authService.criar("Bruno", Papel.OPERADOR, "1111"),
-                authService.criar("Carla", Papel.OPERADOR, "3333"));
+                authService.criar("Ana", Papel.GERENTE, "1234"),
+                authService.criar("Bruno", Papel.OPERADOR, "1234"),
+                authService.criar("Carla", Papel.OPERADOR, "1234"));
     }
 
     private List<Produto> produtos() {
@@ -208,6 +217,7 @@ public class DadosDemonstracao implements ApplicationRunner {
                         "Cofre", equipe.get(1).getId());
                 esperado = caixaService.saldoEsperado(caixaService.buscar(caixa.getId()));
             }
+            reporEstoque(produtos);
             // A maioria dos dias confere; alguns têm sobra ou falta de centavos/poucos reais.
             int sorteio = aleatorio.nextInt(10);
             BigDecimal diferenca = sorteio < 7 ? BigDecimal.ZERO
@@ -234,6 +244,18 @@ public class DadosDemonstracao implements ApplicationRunner {
         for (var m : momentos) {
             relogio.irPara(m.atZone(zona).toInstant());
             venda(operador, produtos, clientes);
+        }
+    }
+
+    /** Fim do dia: repõe o que baixou demais, como o dono faria (entrada de mercadoria). */
+    private void reporEstoque(List<Produto> produtos) {
+        for (Produto p : produtos) {
+            BigDecimal atual = produtoRepository.findById(p.getId()).orElseThrow().getEstoqueAtual();
+            BigDecimal alvo = BigDecimal.valueOf("KG".equals(p.getUnidade()) ? 40 : 60);
+            if (atual.compareTo(BigDecimal.valueOf(15)) < 0 && !"020".equals(p.getCodigoInterno())) {
+                estoqueService.entrada(p.getId(), alvo.subtract(atual),
+                        "Reposição do fornecedor");
+            }
         }
     }
 

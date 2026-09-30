@@ -4,7 +4,10 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
+    "verificar-autoria": "node scripts/verificar-autoria.mjs",
+    "predev": "node scripts/verificar-autoria.mjs",
     "dev": "vite",
+    "prebuild": "node scripts/verificar-autoria.mjs",
     "build": "tsc -b && vite build",
     "preview": "vite preview"
   },
@@ -20,5 +23,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "~5.6.3",
     "vite": "^6.0.3"
-  }
+  },
+  "author": "DaviCarvalhoo <davicarvalhotech@gmail.com>",
+  "license": "SEE LICENSE IN ../LICENSE.md"
 }
