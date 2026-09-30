@@ -8,6 +8,8 @@
 
 # Instalando o Balcão PDV na loja
 
+> Vai instalar numa máquina? Siga o checklist **[REGRAS-DE-INSTALACAO.md](REGRAS-DE-INSTALACAO.md)**, do computador ao teste da tomada.
+
 ## Como os caixas funcionam
 
 ```

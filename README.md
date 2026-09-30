@@ -192,6 +192,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 - backup diário automático.
 
 Guia completo, com a tabela "o que acontece quando…": **[instalacao/LEIA-ME.md](instalacao/LEIA-ME.md)**.
+Checklist para instalar numa loja (energia, BIOS, Windows, teste da tomada): **[instalacao/REGRAS-DE-INSTALACAO.md](instalacao/REGRAS-DE-INSTALACAO.md)**.
 
 ```powershell
 .\instalacao\compilar.ps1                  # gera a tela e o servidor
