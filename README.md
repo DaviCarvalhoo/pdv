@@ -18,7 +18,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 ![React 18](https://img.shields.io/badge/React-18-149eca?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square)
 ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square)
-![Testes](https://img.shields.io/badge/testes-62%20passando-2e7d32?style=flat-square)
+![Testes](https://img.shields.io/badge/testes-65%20passando-2e7d32?style=flat-square)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-propriet%C3%A1ria-d9482b?style=flat-square)
 
 <img src="docs/telas/04-pdv-venda.png" alt="Tela de venda do Balcão PDV" width="920">
@@ -32,6 +32,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 - [Por que o Balcão PDV](#por-que-o-balcão-pdv)
 - [Telas](#telas)
 - [Funcionalidades](#funcionalidades)
+- [Vários caixas e instalação na loja](#vários-caixas-e-instalação-na-loja)
 - [Começando](#começando)
 - [Atalhos de teclado](#atalhos-de-teclado)
 - [Arquitetura](#arquitetura)
@@ -51,7 +52,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 | **Seguro** | Operadores com PIN e perfis. Cancelar, estornar, sangria e desconto alto pedem o PIN do gerente. |
 | **Completo** | Fiado com limite, PIX com QR Code, vale-alimentação, troca com vale-troca, promoções, entrada de nota por XML, curva ABC. |
 | **Fiscal pronto** | NFC-e modelo 65 com chave, XML 4.00, QR Code, DANFE e cancelamento. O emissor é plugável. |
-| **Confiável** | Regras de negócio no domínio, transações atômicas, 62 testes automatizados com PostgreSQL real. |
+| **Confiável** | Regras de negócio no domínio, transações atômicas, 65 testes automatizados com PostgreSQL real. |
 
 ---
 
@@ -77,6 +78,14 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
   <tr>
     <td><img src="docs/telas/07-caixa.png" alt="Caixa"><br><b>Caixa</b><br>Suprimento, sangria, fechamento cego com conferência e extrato.</td>
     <td><img src="docs/telas/12-loja.png" alt="Loja"><br><b>Loja</b><br>Identidade visual com prévia ao vivo, regras da venda, PIX e balança.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/telas/14-escolher-caixa.png" alt="Escolher caixa"><br><b>Qual caixa é este computador?</b><br>Cada aparelho vira um ponto de venda com a sua gaveta.</td>
+    <td><img src="docs/telas/15-caixas-da-loja.png" alt="Caixas da loja"><br><b>Vários caixas ao mesmo tempo</b><br>O gerente acompanha todas as gavetas da loja.</td>
+  </tr>
+  <tr>
+    <td><img src="docs/telas/17-tela-bloqueada.png" alt="Tela bloqueada"><br><b>Bloqueio por inatividade</b><br>Operador saiu de perto? A tela trava e pede o PIN. Nada se perde.</td>
+    <td><img src="docs/telas/16-sem-conexao.png" alt="Sem conexão"><br><b>Queda de conexão</b><br>Aviso claro e reconexão automática.</td>
   </tr>
   <tr>
     <td><img src="docs/telas/09-produtos.png" alt="Produtos"><br><b>Produtos</b><br>Categorias, custo e margem, promoção, atalhos rápidos e etiquetas de gôndola.</td>
@@ -146,6 +155,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 <details>
 <summary><b>Administração e segurança</b></summary>
 
+- **Vários caixas** ao mesmo tempo, cada um com a sua gaveta
 - Operadores com **PIN** (BCrypt) e perfis **operador, gerente e administrador**
 - **Autorização do gerente** de uso único para ações sensíveis
 - Bloqueio após 5 PINs errados
@@ -153,6 +163,31 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 - **Excluir** operadores, produtos, clientes e categorias. O que nunca foi usado é apagado. O que tem histórico sai das telas, libera nome, código de barras e CPF, e as vendas antigas continuam intactas. Vendas, notas e caixas fechados não são excluídos, por serem registro fiscal
 - Configuração fiscal da NFC-e
 </details>
+
+---
+
+## Vários caixas e instalação na loja
+
+- **Um computador é o servidor** (banco de dados e sistema). Numa loja pequena, é o próprio PC do caixa.
+- **Cada aparelho que vende é um caixa** ("Caixa 01", "Caixa 02"…) com **gaveta, abertura e fechamento próprios**. No primeiro acesso, o aparelho pergunta qual caixa ele é.
+- **Os outros aparelhos não instalam nada:** notebook, tablet ou celular abrem `http://IP-DO-SERVIDOR:8080` no navegador.
+- Um aparelho só da gerência fica como **Retaguarda** (painel e relatórios, sem vender).
+
+**Contra falhas:**
+- a sessão se renova enquanto há uso;
+- a tela trava sozinha por inatividade e volta com o PIN;
+- queda de rede mostra um aviso e reconecta sozinha;
+- a finalização é à prova de clique duplo e de queda no meio;
+- erro de tela não deixa tela branca;
+- o servidor reinicia sozinho se cair e sobe com o Windows;
+- backup diário automático.
+
+Guia completo, com a tabela "o que acontece quando…": **[instalacao/LEIA-ME.md](instalacao/LEIA-ME.md)**.
+
+```powershell
+.\instalacao\compilar.ps1                  # gera a tela e o servidor
+.\instalacao\instalar-inicializacao.ps1    # (administrador) liga com o Windows + backup diário às 23:30
+```
 
 ---
 
@@ -294,7 +329,7 @@ cd backend
 mvn test
 ```
 
-**62 testes**, entre unitários e de integração com **PostgreSQL real via Testcontainers**:
+**65 testes**, entre unitários e de integração com **PostgreSQL real via Testcontainers**:
 
 - regras da venda: troco, pagamento dividido, desconto rateado, limite do fiado, imutabilidade;
 - fluxos completos: finalização, caixa, estoque, NFC-e, estorno, troca e vale-troca;
@@ -333,7 +368,7 @@ Situação em 30/09/2026. Os documentos de produto estão em [docs/BRIEFING.md](
 
 ### Operação da loja
 - [ ] Modo offline: vender sem internet e sincronizar depois
-- [ ] Vários caixas abertos ao mesmo tempo e várias lojas
+- [ ] Várias lojas (filiais) no mesmo sistema
 - [ ] Impressão direta em impressora térmica (ESC/POS) e abertura da gaveta
 - [ ] Leitura do peso direto da balança (porta serial/USB)
 - [ ] Pré-venda e orçamento (vendedor monta, caixa recebe)
@@ -348,8 +383,8 @@ Situação em 30/09/2026. Os documentos de produto estão em [docs/BRIEFING.md](
 - [ ] DRE e relatórios financeiros; fechamento por operador
 
 ### Infraestrutura e segurança
-- [ ] Deploy com HTTPS (servidor ou nuvem) e imagem Docker da aplicação completa
-- [ ] Backup automático do banco
+- [ ] Acesso pela internet com HTTPS (hoje é pela rede da loja) e imagem Docker da aplicação completa
+- [ ] Cópia automática do backup para fora do computador (nuvem)
 - [ ] Trilha de auditoria com tela de consulta (quem fez o quê e quando)
 - [ ] Integração contínua (GitHub Actions) e testes de ponta a ponta no frontend
 - [ ] Troca obrigatória dos PINs de demonstração no primeiro acesso em produção
