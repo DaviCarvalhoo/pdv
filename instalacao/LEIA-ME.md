@@ -60,10 +60,46 @@ Para testar sem instalar: `.\instalacao\iniciar-balcao.ps1 -Demo` (loja de demon
 | **Clique duplo em Finalizar** | Ignorado: a venda é finalizada uma vez só. |
 | **Navegador travou / fechou / F5** | Tudo está no servidor: ao abrir de novo, a venda em andamento continua de onde parou. |
 | **Erro inesperado numa tela** | Em vez de tela branca, aparece "Algo deu errado nesta tela · Nada foi perdido" com o botão **Recarregar**. |
-| **O servidor caiu** | O `iniciar-balcao.ps1` o **reinicia sozinho em 5 s** e registra o ocorrido em `logs\supervisor.log`. |
-| **Queda de energia / reiniciou o PC** | O banco e o sistema **sobem sozinhos** com o Windows. Vendas finalizadas nunca se perdem (o banco grava em disco a cada transação). |
-| **Desligar no meio de uma venda** | O servidor termina as requisições em andamento antes de desligar (desligamento suave). |
+| **O servidor caiu** | O `iniciar-balcao.ps1` o **reinicia sozinho em 5 s** e registra o ocorrido em `logs\supervisor.log`. Se faltar memória, o servidor sai e é reiniciado, em vez de ficar travado. |
+| **Rede piscou no meio de um lançamento** | Cada ação (item, pagamento, sangria…) leva uma **chave única** e é **reenviada sozinha por ~10 s** com a mesma chave. Se o servidor já tinha gravado, ele devolve a resposta guardada: **nada é lançado em dobro**. |
+| **Banco caiu com o servidor ligado** | A tela recebe "banco indisponível", mostra a faixa de conexão e reenvia sozinha. Nada fica gravado pela metade (cada operação é uma transação). |
+| **Queda de energia** | Veja a seção abaixo. |
 | **Computador quebrou** | Restaure o **backup diário** (abaixo) em outro computador. |
+
+## Queda de energia
+
+**O que o sistema garante:**
+
+- **Venda confirmada nunca se perde.** O banco só responde "gravado" depois de escrever no disco (`fsync`, fixado no `docker-compose.yml`). Ao religar, ele refaz o diário e volta exatamente ao último estado confirmado.
+- **Nada fica pela metade.** Finalizar uma venda (estoque, gaveta, fiado, vale) é uma transação só: ou tudo, ou nada.
+- **Venda em andamento volta.** Os itens e pagamentos já lançados estão no banco; ao religar, a venda reaparece na tela do caixa.
+- **Troco não some.** Se a tela recarregar logo depois de finalizar, ela mostra de novo a venda concluída com o troco (por 3 minutos).
+- **NFC-e que ficou para trás é emitida sozinha.** A nota é emitida logo depois da venda; se a energia (ou a internet) cair nesse intervalo, o sistema reenvia **ao ligar e a cada 5 minutos**. A numeração não pula.
+- **Conferência ao voltar.** No topo da tela aparecem avisos até serem resolvidos:
+  - **Caixa aberto desde ontem** (a luz caiu à noite): com o atalho "Resolver" para conferir e fechar.
+  - **Relógio do computador atrasado** (bateria da placa-mãe fraca): acerte a hora antes de vender, senão vendas e notas saem com data errada.
+  - **Vendas sem NFC-e autorizada.**
+- **Religa sozinho.** O `iniciar-balcao.ps1` abre o Docker se ele não subiu, espera o banco terminar a recuperação, faz o **backup que ficou para trás** (se o PC estava desligado às 23:30), sobe o servidor e **abre a tela do caixa** em tela cheia.
+
+**Testado de verdade** (teste de caos: 2 caixas vendendo sem parar, 598 vendas):
+
+| Cenário | Resultado |
+|---|---|
+| Servidor encerrado à força no meio das vendas | Voltou em 9 s. Nenhuma venda perdida ou duplicada. |
+| Banco derrubado com o servidor ligado | Voltou em 6 s, sem reiniciar o servidor. Nada gravado pela metade. |
+| Servidor **e** banco derrubados juntos (queda de energia) | Voltou em 16 s. Estoque = histórico, pagamentos = total, numeração fiscal sem buracos. |
+| Vendas finalizadas durante as quedas | Todas com NFC-e autorizada após a recuperação. |
+| Item passado no leitor com o banco fora do ar por 3 s | Entrou **uma vez só**, sem mensagem de erro. |
+| Tela recarregada logo após finalizar | O troco apareceu de novo. |
+
+**O que você precisa fazer uma vez no computador servidor** (o sistema não consegue fazer por você):
+
+1. **Nobreak (UPS).** É o que mais protege: a loja continua vendendo e o Windows desliga limpo. Um de 600 VA segura PC, monitor e impressora por 10 a 15 minutos.
+2. **Ligar sozinho quando a energia volta:** na BIOS/UEFI, em *Power*, ative **"Restore on AC Power Loss" = Power On**.
+3. **Entrar no Windows sem senha** (o sistema sobe no login): `netplwiz` → desmarque "Os usuários devem digitar um nome de usuário e senha".
+4. **Docker Desktop iniciando com o Windows:** Docker Desktop → Settings → General → *Start Docker Desktop when you sign in*.
+
+**Na volta, o operador:** entra com o PIN; se a venda que estava sendo feita reapareceu, **confere os itens com o cliente** e continua. Se o cliente tinha pago por **PIX ou cartão** e a luz caiu antes de lançar, confira o aplicativo do banco ou a maquininha antes de cobrar de novo.
 
 ## Backup e restauração
 

@@ -15,6 +15,13 @@ spring:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/balcao}
     username: ${DB_USER:balcao}
     password: ${DB_PASSWORD:balcao}
+    hikari:
+      # Banco fora do ar (queda de energia): responde em 5 s com "banco indisponível" em vez de travar a tela.
+      connection-timeout: 5000
+      validation-timeout: 3000
+      # Conexões antigas (de antes de o banco reiniciar) são descartadas logo.
+      keepalive-time: 60000
+      max-lifetime: 600000
   jpa:
     open-in-view: false
     hibernate:

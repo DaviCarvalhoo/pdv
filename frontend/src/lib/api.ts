@@ -133,6 +133,19 @@ export interface MovimentacaoEstoque {
   dataHora: string;
 }
 
+/** Conferência pós-queda: pendências que o sistema encontrou (relógio, caixa de ontem, NFC-e). */
+export interface AvisoSistema {
+  codigo: 'RELOGIO_ATRASADO' | 'CAIXA_DE_OUTRO_DIA' | 'NFCE_PENDENTE' | string;
+  nivel: 'erro' | 'alerta';
+  mensagem: string;
+  link?: string;
+}
+
+export interface Saude {
+  horaServidor: string;
+  avisos: AvisoSistema[];
+}
+
 export interface Terminal {
   id: number;
   nome: string;
@@ -558,23 +571,66 @@ export function definirPedidoDeAutorizacao(fn: ((motivo: string) => Promise<stri
   pedirAutorizacao = fn;
 }
 
+/** Chave única por ação: com ela, o servidor reconhece um reenvio e não executa duas vezes. */
+function novaChave(): string {
+  // randomUUID só existe em contexto seguro (https/localhost); os outros caixas da rede usam http://IP.
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto && window.isSecureContext) return crypto.randomUUID();
+  return Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12) + Math.random().toString(36).slice(2, 12);
+}
+
+const esperar = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** Intervalos entre as tentativas quando a conexão falha: ~10 s no total antes de desistir. */
+const REENVIOS_MS = [700, 1500, 3000, 5000];
+
+/**
+ * Ações que gravam (lançar item, pagamento, sangria...) levam uma chave de idempotência e são reenviadas
+ * sozinhas, com a MESMA chave, se a rede ou o banco falharem no meio. Se o servidor já tinha gravado, ele
+ * devolve a resposta guardada: nada é lançado em dobro. A finalização fica de fora (a tela confere a venda).
+ */
+function podeReenviar(method: string, url: string) {
+  return method !== 'GET' && !url.startsWith('/auth/') && !url.endsWith('/finalizar') && !url.endsWith('/nfce');
+}
+
 async function request<T>(method: string, url: string, body?: unknown, autorizacao?: string): Promise<T> {
   const headers: Record<string, string> = {};
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (tokenAtual) headers.Authorization = 'Bearer ' + tokenAtual;
   if (autorizacao) headers['X-Autorizacao'] = autorizacao;
   if (terminalAtual) headers['X-Terminal'] = String(terminalAtual);
+  const reenviar = podeReenviar(method, url);
+  if (reenviar) headers['X-Idempotencia'] = novaChave();
+  const corpo = body !== undefined ? JSON.stringify(body) : undefined;
+
   let resp: Response;
-  try {
-    resp = await fetch('/api' + url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
-  } catch {
+  for (let tentativa = 0; ; tentativa++) {
+    const r = await fetch('/api' + url, { method, headers, body: corpo }).catch(() => null);
+    // Sem resposta, proxy sem servidor (502/504) ou banco reiniciando (503): é falta de conexão, não erro.
+    if (r && r.status !== 502 && r.status !== 503 && r.status !== 504) {
+      resp = r;
+      break;
+    }
     aoMudarConexao(false);
-    throw new ApiError(0, 'SEM_CONEXAO', 'Sem conexão com o servidor. A operação não foi concluída; tente de novo quando a conexão voltar.');
+    if (!reenviar || tentativa >= REENVIOS_MS.length) {
+      throw new ApiError(
+        0,
+        'SEM_CONEXAO',
+        reenviar
+          ? 'Sem conexão com o servidor. Quando a conexão voltar, a tela mostra o que ficou registrado: confira antes de repetir.'
+          : 'Sem conexão com o servidor. A operação não foi concluída; tente de novo quando a conexão voltar.',
+      );
+    }
+    await esperar(REENVIOS_MS[tentativa]);
   }
   aoMudarConexao(true);
   if (resp.status === 204) return undefined as T;
   const texto = await resp.text();
-  const dados = texto ? JSON.parse(texto) : undefined;
+  let dados: any;
+  try {
+    dados = texto ? JSON.parse(texto) : undefined;
+  } catch {
+    dados = undefined;
+  }
   if (!resp.ok) {
     let mensagem: string = dados?.detail ?? `Erro ${resp.status}`;
     if (dados?.campos) mensagem = Object.values(dados.campos as Record<string, string>).join(' · ');
@@ -620,6 +676,7 @@ export const api = {
 
   // Loja
   lojaPublica: () => request<LojaPublica>('GET', '/loja/publica'),
+  saude: () => request<Saude>('GET', '/sistema/saude'),
   loja: () => request<Loja>('GET', '/loja'),
   salvarLoja: (l: Partial<Loja>) => request<Loja>('PUT', '/loja', l),
 

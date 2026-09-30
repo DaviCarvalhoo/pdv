@@ -9,6 +9,7 @@
 import { useEffect, useState } from 'react';
 import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import AutorizacaoGerente from './components/AutorizacaoGerente';
+import AvisosSistema from './components/AvisosSistema';
 import BloqueioTela from './components/BloqueioTela';
 import EscolherTerminal from './components/EscolherTerminal';
 import ErroTela from './components/ErroTela';
@@ -163,10 +164,11 @@ function Estrutura() {
       <main className="conteudo">
         {!online && (
           <div className="sem-conexao" role="alert">
-            <strong>Sem conexão com o servidor.</strong> Tentando reconectar… Nada do que já foi salvo se perde; a operação que
-            falhou precisa ser repetida quando a conexão voltar.
+            <strong>Sem conexão com o servidor.</strong> Tentando reconectar… Nada do que já foi salvo se perde. As ações
+            feitas agora são reenviadas sozinhas por alguns segundos, sem risco de lançar em dobro.
           </div>
         )}
+        {online && <AvisosSistema />}
         <ErroTela chave={local.pathname}>
         <Routes>
           <Route path="/" element={<Navigate to={pode('GERENTE') ? '/painel' : '/pdv'} replace />} />

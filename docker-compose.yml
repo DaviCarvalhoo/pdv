@@ -9,6 +9,11 @@ services:
     container_name: balcao-postgres
     # Volta sozinho depois de reiniciar o computador ou o Docker.
     restart: unless-stopped
+    # Durabilidade: toda venda confirmada já está no disco (fsync). São os padrões do PostgreSQL, fixados aqui
+    # para ninguém "acelerar" o banco trocando segurança por velocidade.
+    command: ["postgres", "-c", "fsync=on", "-c", "synchronous_commit=on", "-c", "full_page_writes=on"]
+    # Ao desligar o Windows normalmente, dá tempo de o banco fechar limpo.
+    stop_grace_period: 30s
     environment:
       POSTGRES_DB: balcao
       POSTGRES_USER: balcao

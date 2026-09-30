@@ -23,6 +23,32 @@ export interface LeitorHandle {
   preencher: (texto: string, cursorNoInicio?: boolean) => void;
 }
 
+/** Última venda finalizada neste aparelho, por 3 minutos: o troco não some se a tela recarregar. */
+const CHAVE_CONCLUIDA = 'balcao.ultimaConcluida';
+interface Concluida {
+  vendaId: number;
+  caixaId: number;
+  em: number;
+}
+
+function ultimaConcluida(): Concluida | null {
+  try {
+    const c = JSON.parse(localStorage.getItem(CHAVE_CONCLUIDA) ?? 'null') as Concluida | null;
+    return c && Date.now() - c.em < 3 * 60 * 1000 ? c : null;
+  } catch {
+    return null;
+  }
+}
+
+function guardarConcluida(c: Concluida | null) {
+  try {
+    if (c) localStorage.setItem(CHAVE_CONCLUIDA, JSON.stringify(c));
+    else localStorage.removeItem(CHAVE_CONCLUIDA);
+  } catch {
+    /* navegação privada */
+  }
+}
+
 export default function PaginaPdv() {
   const { caixa, carregando, recarregar } = useCaixa();
   const { operador, terminal, reconexoes } = useSessao();
@@ -47,9 +73,27 @@ export default function PaginaPdv() {
   }, []);
 
   // Retoma a venda em andamento só quando o caixa muda (não a cada atualização do saldo da gaveta).
+  // Sem venda aberta, mas uma acabou de ser finalizada neste aparelho (a tela recarregou ou a energia piscou
+  // antes de o operador ler o troco): mostra de novo a tela de venda concluída.
   useEffect(() => {
     if (!caixaId) return;
-    api.vendaAberta().then((v) => setVenda(v ?? null)).catch(erro);
+    api
+      .vendaAberta()
+      .then(async (v) => {
+        if (v) return setVenda(v);
+        const ultima = ultimaConcluida();
+        if (ultima && ultima.caixaId === caixaId) {
+          const concluida = await api.venda(ultima.vendaId).catch(() => null);
+          if (concluida?.status === 'FINALIZADA') {
+            setVenda(concluida);
+            setModo('concluida');
+            if (concluida.notaFiscal?.status === 'AUTORIZADA') api.danfe(concluida.notaFiscal.id).then(setDanfe).catch(() => undefined);
+            return;
+          }
+        }
+        setVenda(null);
+      })
+      .catch(erro);
     api.atalhos().then(setAtalhos).catch(() => undefined);
     recarregarEspera();
   }, [caixaId, erro, recarregarEspera]);
@@ -154,12 +198,14 @@ export default function PaginaPdv() {
       v = atual;
     }
     setModo('concluida');
+    guardarConcluida({ vendaId: v.id, caixaId: v.caixaId, em: Date.now() });
     v.avisos.forEach((a) => avisar(a, 'info'));
     recarregar();
     if (v.notaFiscal?.status === 'AUTORIZADA') api.danfe(v.notaFiscal.id).then(setDanfe).catch(erro);
   };
 
   const novaVenda = () => {
+    guardarConcluida(null);
     setVenda(null);
     setDanfe(null);
     setModo('itens');

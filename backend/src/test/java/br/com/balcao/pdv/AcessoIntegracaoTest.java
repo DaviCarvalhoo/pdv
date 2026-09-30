@@ -117,6 +117,8 @@ class AcessoIntegracaoTest extends IntegracaoBase {
                         .content("{\"usuarioId\":" + carla.getId() + ",\"pin\":\"3333\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("bloqueado")));
+        // O bloqueio fica em memória: libera para não afetar outros testes que reaproveitam o mesmo id.
+        authService.redefinirPin(carla.getId(), "3333");
     }
 
     private String entrar(Long usuarioId, String pin) throws Exception {

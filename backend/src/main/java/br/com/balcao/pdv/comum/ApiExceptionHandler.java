@@ -91,6 +91,18 @@ public class ApiExceptionHandler {
         return p;
     }
 
+    /** Banco fora do ar (queda de energia, Docker reiniciando): a tela trata como falta de conexão. */
+    @ExceptionHandler({org.springframework.dao.DataAccessResourceFailureException.class,
+            org.springframework.transaction.CannotCreateTransactionException.class,
+            org.springframework.dao.QueryTimeoutException.class})
+    ProblemDetail bancoIndisponivel(Exception e) {
+        log.warn("Banco indisponível: {}", e.getMessage());
+        ProblemDetail p = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE,
+                br.com.balcao.pdv.config.BancoIndisponivelFilter.MENSAGEM);
+        p.setProperty("codigo", "BANCO_INDISPONIVEL");
+        return p;
+    }
+
     private ProblemDetail problema(HttpStatus status, RegraNegocioException e) {
         ProblemDetail p = ProblemDetail.forStatusAndDetail(status, e.getMessage());
         p.setTitle(status.getReasonPhrase());

@@ -6,12 +6,13 @@
 
 # Deixa o Balcão PDV ligando sozinho com o Windows e com backup diário às 23:30.
 # Rode UMA vez, como administrador (botão direito > Executar com PowerShell como administrador).
-param([switch]$Demo)
+# -SemTela: não abre a tela do caixa sozinha (use no computador que é só servidor).
+param([switch]$Demo, [switch]$SemTela)
 $ErrorActionPreference = 'Stop'
 $aqui = $PSScriptRoot
 $usuario = "$env:USERDOMAIN\$env:USERNAME"
 
-$iniciar = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$aqui\iniciar-balcao.ps1`"" + $(if ($Demo) { ' -Demo' } else { '' })
+$iniciar = "-NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File `"$aqui\iniciar-balcao.ps1`"" + $(if ($Demo) { ' -Demo' } else { '' }) + $(if ($SemTela) { '' } else { ' -AbrirTela' })
 Register-ScheduledTask -TaskName 'Balcao PDV' -Force `
     -Action (New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $iniciar) `
     -Trigger (New-ScheduledTaskTrigger -AtLogOn -User $usuario) `

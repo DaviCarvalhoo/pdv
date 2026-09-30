@@ -18,7 +18,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 ![React 18](https://img.shields.io/badge/React-18-149eca?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square)
 ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square)
-![Testes](https://img.shields.io/badge/testes-65%20passando-2e7d32?style=flat-square)
+![Testes](https://img.shields.io/badge/testes-69%20passando-2e7d32?style=flat-square)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-propriet%C3%A1ria-d9482b?style=flat-square)
 
 <img src="docs/telas/04-pdv-venda.png" alt="Tela de venda do Balcão PDV" width="920">
@@ -52,7 +52,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 | **Seguro** | Operadores com PIN e perfis. Cancelar, estornar, sangria e desconto alto pedem o PIN do gerente. |
 | **Completo** | Fiado com limite, PIX com QR Code, vale-alimentação, troca com vale-troca, promoções, entrada de nota por XML, curva ABC. |
 | **Fiscal pronto** | NFC-e modelo 65 com chave, XML 4.00, QR Code, DANFE e cancelamento. O emissor é plugável. |
-| **Confiável** | Regras de negócio no domínio, transações atômicas, 65 testes automatizados com PostgreSQL real. |
+| **Confiável** | Regras de negócio no domínio, transações atômicas, 69 testes automatizados com PostgreSQL real. |
 
 ---
 
@@ -86,6 +86,9 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
   <tr>
     <td><img src="docs/telas/17-tela-bloqueada.png" alt="Tela bloqueada"><br><b>Bloqueio por inatividade</b><br>Operador saiu de perto? A tela trava e pede o PIN. Nada se perde.</td>
     <td><img src="docs/telas/16-sem-conexao.png" alt="Sem conexão"><br><b>Queda de conexão</b><br>Aviso claro e reconexão automática.</td>
+  </tr>
+  <tr>
+    <td colspan="2"><img src="docs/telas/20-aviso-apos-queda.png" alt="Aviso após queda"><br><b>Depois de uma queda de energia</b><br>O sistema confere sozinho e avisa: caixa aberto desde ontem, relógio do PC atrasado, NFC-e pendente.</td>
   </tr>
   <tr>
     <td><img src="docs/telas/09-produtos.png" alt="Produtos"><br><b>Produtos</b><br>Categorias, custo e margem, promoção, atalhos rápidos e etiquetas de gôndola.</td>
@@ -179,6 +182,11 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 - a tela trava sozinha por inatividade e volta com o PIN;
 - queda de rede ou do servidor mostra um aviso e reconecta sozinha, sem pedir login de novo e sem perder a venda;
 - a finalização é à prova de clique duplo e de queda no meio;
+- **nada é lançado em dobro**: cada ação leva uma chave única e é reenviada sozinha se a rede piscar;
+- **queda de energia testada de verdade**: servidor e banco derrubados à força no meio de 598 vendas em 2 caixas, sem perder nem duplicar nada, com estoque e numeração fiscal íntegros;
+- NFC-e que ficou sem emitir na queda é enviada sozinha ao religar;
+- ao voltar, avisos de **caixa aberto desde ontem** e **relógio do PC atrasado**;
+- o sistema religa sozinho: abre o Docker, espera o banco, faz o backup atrasado e abre a tela do caixa;
 - erro de tela não deixa tela branca;
 - o servidor reinicia sozinho se cair e sobe com o Windows;
 - backup diário automático.
@@ -330,7 +338,7 @@ cd backend
 mvn test
 ```
 
-**65 testes**, entre unitários e de integração com **PostgreSQL real via Testcontainers**:
+**69 testes**, entre unitários e de integração com **PostgreSQL real via Testcontainers**:
 
 - regras da venda: troco, pagamento dividido, desconto rateado, limite do fiado, imutabilidade;
 - fluxos completos: finalização, caixa, estoque, NFC-e, estorno, troca e vale-troca;
