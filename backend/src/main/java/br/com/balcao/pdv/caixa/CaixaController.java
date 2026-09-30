@@ -49,6 +49,7 @@ public class CaixaController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CaixaResponse abrir(@Valid @RequestBody AberturaRequest req) {
+        exigirGerenteSeConfigurado("Abrir o caixa");
         Caixa caixa = service.abrir(req.saldoInicial(), contexto.operadorId(), contexto.terminalId());
         return resposta(caixa);
     }
@@ -105,12 +106,20 @@ public class CaixaController {
 
     @PostMapping("/{id}/fechar")
     public ExtratoCaixa fechar(@PathVariable Long id, @Valid @RequestBody FechamentoRequest req) {
+        exigirGerenteSeConfigurado("Fechar o caixa");
         return service.fechar(id, req.valorContado(), contexto.operadorId());
     }
 
     @GetMapping("/{id}/extrato")
     public ExtratoCaixa extrato(@PathVariable Long id) {
         return service.extrato(id);
+    }
+
+    /** Pela configuração da loja, abrir e fechar pode ser só com gerente: o operador digita o PIN do gerente. */
+    private void exigirGerenteSeConfigurado(String acao) {
+        if (lojaService.obter().isCaixaSoGerente()) {
+            contexto.exigirGerente(acao);
+        }
     }
 
     /** Resposta com o saldo esperado e o alerta de sangria (gaveta acima do limite da loja). */

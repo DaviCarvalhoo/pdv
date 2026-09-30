@@ -25,7 +25,7 @@ export interface LeitorHandle {
 
 export default function PaginaPdv() {
   const { caixa, carregando, recarregar } = useCaixa();
-  const { operador, terminal } = useSessao();
+  const { operador, terminal, reconexoes } = useSessao();
   const { avisar, erro } = useAvisos();
 
   const [venda, setVenda] = useState<Venda | null>(null);
@@ -53,6 +53,14 @@ export default function PaginaPdv() {
     api.atalhos().then(setAtalhos).catch(() => undefined);
     recarregarEspera();
   }, [caixaId, erro, recarregarEspera]);
+
+  // A conexão voltou: busca de novo a venda em andamento (o servidor é a fonte da verdade).
+  useEffect(() => {
+    if (!reconexoes || modo === 'concluida') return;
+    api.vendaAberta().then((v) => setVenda(v ?? null)).catch(() => undefined);
+    recarregarEspera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reconexoes]);
 
   const executar = useCallback(
     async (acao: () => Promise<Venda>, aoConcluir?: (v: Venda) => void) => {
@@ -516,6 +524,7 @@ function CaixaFechado({ nome, retaguarda }: { nome?: string; retaguarda?: boolea
         <Link className="botao botao--principal botao--grande" to="/caixa">
           Abrir caixa
         </Link>
+        <p className="dica fechado__dica">Este computador está em outro caixa? O gerente troca em Caixa → “trocar”.</p>
       </div>
     </div>
   );

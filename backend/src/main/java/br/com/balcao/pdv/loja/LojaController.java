@@ -32,13 +32,13 @@ public class LojaController {
                                BigDecimal limiteGaveta, BigDecimal descontoMaxOperador, String balancaPrefixo,
                                Integer balancaDigitosCodigo, TipoValorBalanca balancaTipoValor, String chavePix,
                                String pixRecebedor, String pixCidade, boolean pixConfigurado,
-                               BigDecimal aliquotaTributos, Integer bloqueioInatividadeMin) {
+                               BigDecimal aliquotaTributos, Integer bloqueioInatividadeMin, boolean caixaSoGerente) {
         static LojaResponse de(Loja l) {
             return new LojaResponse(l.getNomeFantasia(), l.getSlogan(), l.getLogo(), l.getCorDestaque(),
                     l.getMensagemCupom(), l.getPoliticaEstoque(), l.getLimiteGaveta(), l.getDescontoMaxOperador(),
                     l.getBalancaPrefixo(), l.getBalancaDigitosCodigo(), l.getBalancaTipoValor(), l.getChavePix(),
                     l.getPixRecebedor(), l.getPixCidade(), l.getChavePix() != null, l.getAliquotaTributos(),
-                    l.getBloqueioInatividadeMin());
+                    l.getBloqueioInatividadeMin(), l.isCaixaSoGerente());
         }
     }
 

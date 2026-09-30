@@ -31,6 +31,9 @@
 - **Produtos, clientes, estoque e relatórios são um só** para a loja inteira. As vendas de cada caixa caem na gaveta daquele caixa, e o painel mostra o total e o total **por caixa**.
 - Um aparelho só da gerência (sem vender) pode ser marcado como **Retaguarda**.
 - Os caixas são cadastrados em **Loja → Caixas**. Numa loja de um caixa só, não é preciso configurar nada: o "Caixa 01" já vem pronto.
+- **Quem abre e fecha o caixa:** por padrão, só gerente ou administrador. Se o operador estiver no balcão, o sistema pede o **PIN do gerente** na hora. Dá para liberar para todos em **Loja → Regras da venda**.
+- **Trocar de operador não fecha o caixa:** a gaveta é do computador, não da pessoa. Um operador sai (ícone de sair ou "Trocar de operador" na tela bloqueada), o outro entra e continua vendendo na mesma gaveta. Cada venda registra quem vendeu.
+- **Trocar qual caixa é este computador:** o gerente usa **Caixa → "trocar"** (ao lado de "Este computador: Caixa 01").
 
 ## Instalação (uma vez, no computador servidor)
 
@@ -52,7 +55,7 @@ Para testar sem instalar: `.\instalacao\iniciar-balcao.ps1 -Demo` (loja de demon
 |---|---|
 | **Operador sai de perto do caixa** | Depois de 10 min sem uso (configurável em Loja), a tela **trava** e pede o PIN. A venda em andamento não se perde. |
 | **Sessão expirou / acesso removido** | Volta para o login **explicando o motivo**. A venda em andamento continua salva e reaparece ao entrar de novo. A sessão se renova sozinha enquanto o operador trabalha e só expira depois de 12 h sem nenhum uso. |
-| **Wi-Fi caiu / servidor desligou** | Aparece a faixa vermelha **"Sem conexão com o servidor"**, e o sistema tenta reconectar a cada 3 s. Quando volta, a faixa some. A operação que falhou deve ser repetida. |
+| **Wi-Fi caiu / servidor desligou** | Aparece a faixa vermelha **"Sem conexão com o servidor"**, e o sistema tenta reconectar a cada 3 s. Quando o servidor volta, a faixa some sozinha, **o operador continua logado** (a sessão fica no banco, não no servidor) e a tela **recarrega a venda em andamento**. Só a operação que falhou durante a queda precisa ser repetida. Testado: servidor desligado no meio de uma venda e religado; voltou em 13 s, sem perder a venda e sem pedir login. |
 | **A conexão caiu bem na hora de finalizar** | Ao repetir, o sistema **confere se a venda já foi gravada** antes de cobrar de novo. A finalização é atômica: ou grava tudo (estoque, caixa, fiado), ou não grava nada. |
 | **Clique duplo em Finalizar** | Ignorado: a venda é finalizada uma vez só. |
 | **Navegador travou / fechou / F5** | Tudo está no servidor: ao abrir de novo, a venda em andamento continua de onde parou. |

@@ -63,6 +63,7 @@ export interface Loja extends LojaPublica {
   pixConfigurado: boolean;
   aliquotaTributos?: number;
   bloqueioInatividadeMin: number;
+  caixaSoGerente: boolean;
 }
 
 export interface Categoria {

@@ -71,7 +71,15 @@ class AcessoIntegracaoTest extends IntegracaoBase {
         mvc.perform(get("/api/relatorios/painel").header("Authorization", "Bearer " + operador))
                 .andExpect(status().isForbidden()).andExpect(jsonPath("$.codigo").value("SEM_PERMISSAO"));
 
+        // Abrir o caixa é só com gerente (padrão da loja): o operador precisa do PIN do gerente.
+        mvc.perform(post("/api/caixas").header("Authorization", "Bearer " + operador)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"saldoInicial\":200}"))
+                .andExpect(status().isForbidden()).andExpect(jsonPath("$.codigo").value("AUTORIZACAO_NECESSARIA"));
+        String paraAbrir = json.readTree(mvc.perform(post("/api/auth/autorizar")
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"pin\":\"2222\"}"))
+                .andReturn().getResponse().getContentAsString()).get("autorizacao").asText();
         String caixa = mvc.perform(post("/api/caixas").header("Authorization", "Bearer " + operador)
+                        .header("X-Autorizacao", paraAbrir)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"saldoInicial\":200}"))
                 .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         long caixaId = json.readTree(caixa).get("id").asLong();

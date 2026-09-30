@@ -151,6 +151,10 @@ export default function PaginaLoja() {
                 Avisar sangria acima de (R$)
                 <input inputMode="decimal" placeholder="sem aviso" {...texto('limiteGaveta')} />
               </label>
+              <label className="alternador formulario__cheio">
+                <input type="checkbox" checked={f.caixaSoGerente !== false} onChange={(e) => setF({ ...f, caixaSoGerente: e.target.checked })} />
+                Só gerente ou administrador abre e fecha o caixa (o operador pede o PIN do gerente)
+              </label>
               <label>
                 Travar a tela após (min) <small>0 desliga · pede o PIN para voltar</small>
                 <input inputMode="numeric" {...texto('bloqueioInatividadeMin')} />

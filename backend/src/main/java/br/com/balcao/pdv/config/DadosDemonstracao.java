@@ -110,7 +110,7 @@ public class DadosDemonstracao implements ApplicationRunner {
         lojaService.atualizar(new LojaService.LojaRequest("Mercadinho Exemplo", "Do bairro, pro bairro", logo,
                 "#D9482B", "Obrigado pela preferência! Volte sempre.", PoliticaSaldoInsuficiente.PERMITIR_E_AVISAR,
                 new BigDecimal("600.00"), new BigDecimal("5"), "2", 4, TipoValorBalanca.PRECO,
-                "pix@mercadinhoexemplo.com.br", "Mercadinho Exemplo", "Sao Paulo", new BigDecimal("31.45"), 10));
+                "pix@mercadinhoexemplo.com.br", "Mercadinho Exemplo", "Sao Paulo", new BigDecimal("31.45"), 10, true));
         // Um segundo ponto de venda (balcão externo) para mostrar vários caixas ao mesmo tempo.
         terminalRepository.save(new br.com.balcao.pdv.caixa.Terminal("Caixa 02"));
         configuracaoFiscalService.atualizar(new ConfiguracaoFiscalDto.Request(

@@ -61,6 +61,9 @@ public class Loja {
     /** Minutos sem uso até a tela travar pedindo o PIN (0 desliga). */
     private Integer bloqueioInatividadeMin;
 
+    /** Abrir e fechar o caixa só com gerente/administrador (operador pede o PIN do gerente). */
+    private boolean caixaSoGerente = true;
+
     private OffsetDateTime atualizadoEm;
 
     @PreUpdate

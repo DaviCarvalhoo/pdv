@@ -91,6 +91,8 @@ interface SessaoCtx {
   terminal: EsteComputador | null;
   definirTerminal: (t: EsteComputador | null) => void;
   online: boolean;
+  /** Aumenta a cada vez que a conexão volta: as telas recarregam o que estão mostrando. */
+  reconexoes: number;
 }
 
 const SessaoContext = createContext<SessaoCtx>(null!);
@@ -112,6 +114,8 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   const [motivoSaida, setMotivoSaida] = useState<string | null>(null);
   const [terminal, setTerminal] = useState<EsteComputador | null>(terminalSalvo());
   const [online, setOnline] = useState(true);
+  const [reconexoes, setReconexoes] = useState(0);
+  const onlineRef = useRef(true);
 
   const recarregarLoja = useCallback(async () => {
     try {
@@ -132,7 +136,11 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
       setMotivoSaida('Sua sessão terminou (muito tempo sem uso ou acesso encerrado pelo administrador). Entre de novo: a venda em andamento continua salva.');
       setSessao(null);
     });
-    aoConexao(setOnline);
+    aoConexao((agora) => {
+      if (agora && !onlineRef.current) setReconexoes((n) => n + 1);
+      onlineRef.current = agora;
+      setOnline(agora);
+    });
   }, [recarregarLoja]);
 
   // Sem conexão: tenta o servidor a cada 3 s até voltar.
@@ -166,7 +174,7 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
   return (
     <SessaoContext.Provider
-      value={{ sessao, operador, pode, entrar, sair, loja, recarregarLoja, motivoSaida, terminal, definirTerminal, online }}
+      value={{ sessao, operador, pode, entrar, sair, loja, recarregarLoja, motivoSaida, terminal, definirTerminal, online, reconexoes }}
     >
       {children}
     </SessaoContext.Provider>
@@ -188,7 +196,7 @@ const CaixaContext = createContext<CaixaCtx>(null!);
 export function CaixaProvider({ children }: { children: ReactNode }) {
   const [caixa, setCaixa] = useState<Caixa | null>(null);
   const [carregando, setCarregando] = useState(true);
-  const { terminal } = useSessao();
+  const { terminal, reconexoes } = useSessao();
   const retaguarda = !!terminal && 'retaguarda' in terminal;
 
   const recarregar = useCallback(async () => {
@@ -208,7 +216,7 @@ export function CaixaProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     recarregar();
-  }, [recarregar]);
+  }, [recarregar, reconexoes]);
 
   return <CaixaContext.Provider value={{ caixa, carregando, recarregar }}>{children}</CaixaContext.Provider>;
 }

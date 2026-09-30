@@ -24,6 +24,11 @@ export default function PaginaCaixa() {
   const [terminais, setTerminais] = useState<Terminal[]>([]);
   const [trocando, setTrocando] = useState(false);
   const { terminal, pode } = useSessao();
+  const [soGerente, setSoGerente] = useState(false);
+  useEffect(() => {
+    api.loja().then((l) => setSoGerente(l.caixaSoGerente)).catch(() => undefined);
+  }, []);
+  const pedePin = soGerente && !pode('GERENTE');
   const retaguarda = !!terminal && 'retaguarda' in terminal;
   const nomeTerminal = terminal && 'nome' in terminal ? terminal.nome : 'Retaguarda';
 
@@ -83,7 +88,7 @@ export default function PaginaCaixa() {
         </p>
       )}
 
-      {!retaguarda && !caixa && !fechamento && <Abertura aoAbrir={recarregar} nome={nomeTerminal} />}
+      {!retaguarda && !caixa && !fechamento && <Abertura aoAbrir={recarregar} nome={nomeTerminal} pedePin={pedePin} />}
 
       {terminais.filter((t) => t.ativo).length > 1 || retaguarda ? (
         <section className="bloco">
@@ -195,13 +200,14 @@ export default function PaginaCaixa() {
   );
 }
 
-function Abertura({ aoAbrir, nome }: { aoAbrir: () => Promise<void>; nome: string }) {
+function Abertura({ aoAbrir, nome, pedePin }: { aoAbrir: () => Promise<void>; nome: string; pedePin: boolean }) {
   const [valor, setValor] = useState('');
   const { avisar, erro } = useAvisos();
   return (
     <section className="abertura">
       <p className="sobretitulo">Começar o dia</p>
       <h2>Abrir o {nome}: quanto tem na gaveta para troco?</h2>
+      {pedePin && <p className="dica">Abrir e fechar o caixa pede o PIN do gerente.</p>}
       <form
         onSubmit={async (e) => {
           e.preventDefault();

@@ -172,11 +172,12 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 - **Cada aparelho que vende é um caixa** ("Caixa 01", "Caixa 02"…) com **gaveta, abertura e fechamento próprios**. No primeiro acesso, o aparelho pergunta qual caixa ele é.
 - **Os outros aparelhos não instalam nada:** notebook, tablet ou celular abrem `http://IP-DO-SERVIDOR:8080` no navegador.
 - Um aparelho só da gerência fica como **Retaguarda** (painel e relatórios, sem vender).
+- **Abrir e fechar o caixa é com gerente ou administrador** (o operador pede o PIN do gerente; configurável). Trocar de operador **não fecha o caixa**: a gaveta é do computador.
 
 **Contra falhas:**
 - a sessão se renova enquanto há uso;
 - a tela trava sozinha por inatividade e volta com o PIN;
-- queda de rede mostra um aviso e reconecta sozinha;
+- queda de rede ou do servidor mostra um aviso e reconecta sozinha, sem pedir login de novo e sem perder a venda;
 - a finalização é à prova de clique duplo e de queda no meio;
 - erro de tela não deixa tela branca;
 - o servidor reinicia sozinho se cair e sobe com o Windows;
