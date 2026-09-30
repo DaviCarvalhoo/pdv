@@ -8,6 +8,7 @@
 
 package br.com.balcao.pdv.usuario;
 
+import br.com.balcao.pdv.comum.Exclusao;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -66,6 +67,12 @@ public class UsuarioController {
     public UsuarioResponse atualizar(@PathVariable Long id, @Valid @RequestBody UsuarioRequest req) {
         return UsuarioResponse.de(service.atualizar(id, req.nome(), req.papel(),
                 req.ativo() == null || req.ativo(), contexto.operador()));
+    }
+
+    @DeleteMapping("/{id}")
+    @Requer(Papel.ADMIN)
+    public Exclusao excluir(@PathVariable Long id) {
+        return service.excluir(id, contexto.operador());
     }
 
     @PutMapping("/{id}/pin")

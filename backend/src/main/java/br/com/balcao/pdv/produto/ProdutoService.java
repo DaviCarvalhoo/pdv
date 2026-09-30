@@ -10,12 +10,14 @@ package br.com.balcao.pdv.produto;
 
 import br.com.balcao.pdv.comum.ConflitoException;
 import br.com.balcao.pdv.comum.Dinheiro;
+import br.com.balcao.pdv.comum.Exclusao;
 import br.com.balcao.pdv.comum.NaoEncontradoException;
 import br.com.balcao.pdv.comum.RegraNegocioException;
 import br.com.balcao.pdv.estoque.EstoqueService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,6 +32,7 @@ public class ProdutoService {
     private final ProdutoRepository repository;
     private final EstoqueService estoqueService;
     private final CategoriaRepository categoriaRepository;
+    private final JdbcTemplate jdbc;
 
     @Transactional
     public Produto cadastrar(ProdutoRequest req) {
@@ -121,6 +124,27 @@ public class ProdutoService {
         }
         produto.setAtivo(false);
         return produto;
+    }
+
+    /**
+     * Exclui o produto. Nunca vendido: é apagado junto com o histórico de estoque. Já vendido: fica fora das
+     * telas e da busca, e o GTIN e o código interno ficam livres para um novo cadastro.
+     */
+    @Transactional
+    public Exclusao excluir(Long id) {
+        Produto produto = buscar(id);
+        Integer vendas = jdbc.queryForObject("select count(*) from item_venda where produto_id = ?", Integer.class, id);
+        if (vendas == null || vendas == 0) {
+            jdbc.update("delete from movimentacao_estoque where produto_id = ?", id);
+            repository.delete(produto);
+            return Exclusao.apagado("Produto");
+        }
+        produto.setAtivo(false);
+        produto.setExcluido(true);
+        produto.setAtalhoRapido(false);
+        produto.setGtin(null);
+        produto.setCodigoInterno(null);
+        return Exclusao.arquivado("Produto");
     }
 
     @Transactional

@@ -9,10 +9,12 @@
 package br.com.balcao.pdv.usuario;
 
 import br.com.balcao.pdv.comum.ConflitoException;
+import br.com.balcao.pdv.comum.Exclusao;
 import br.com.balcao.pdv.comum.NaoAutenticadoException;
 import br.com.balcao.pdv.comum.NaoEncontradoException;
 import br.com.balcao.pdv.comum.RegraNegocioException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -43,6 +45,7 @@ public class AuthService {
     private final UsuarioRepository usuarios;
     private final SessaoRepository sessoes;
     private final Clock relogio;
+    private final JdbcTemplate jdbc;
     private final BCryptPasswordEncoder bcrypt = new BCryptPasswordEncoder(10);
     private final SecureRandom aleatorio = new SecureRandom();
 
@@ -57,10 +60,11 @@ public class AuthService {
     public record Login(String token, Operador operador, OffsetDateTime expiraEm) {
     }
 
-    public AuthService(UsuarioRepository usuarios, SessaoRepository sessoes, Clock relogio) {
+    public AuthService(UsuarioRepository usuarios, SessaoRepository sessoes, Clock relogio, JdbcTemplate jdbc) {
         this.usuarios = usuarios;
         this.sessoes = sessoes;
         this.relogio = relogio;
+        this.jdbc = jdbc;
     }
 
     @Transactional(readOnly = true)
@@ -149,7 +153,7 @@ public class AuthService {
 
     @Transactional(readOnly = true)
     public List<Usuario> listar() {
-        return usuarios.findAllByOrderByAtivoDescNome();
+        return usuarios.findByExcluidoFalseOrderByAtivoDescNome();
     }
 
     @Transactional
@@ -184,6 +188,39 @@ public class AuthService {
         u.setPinHash(hash(pin));
         tentativas.remove(id);
         sessoes.encerrarDoUsuario(id);
+    }
+
+    /**
+     * Exclui o operador. Sem histórico, é apagado; com vendas ou movimentações, é marcado como excluído,
+     * perde o acesso e libera o nome para um novo cadastro.
+     */
+    @Transactional
+    public Exclusao excluir(Long id, Operador quem) {
+        Usuario u = buscar(id);
+        if (quem != null && quem.id().equals(id)) {
+            throw new RegraNegocioException("EXCLUIR_A_SI_MESMO", "Você não pode excluir o próprio usuário.");
+        }
+        if (u.getPapel() == Papel.ADMIN && u.isAtivo() && usuarios.countByAtivoTrueAndPapel(Papel.ADMIN) <= 1) {
+            throw new RegraNegocioException("ULTIMO_ADMIN", "É preciso manter pelo menos um administrador ativo.");
+        }
+        sessoes.encerrarDoUsuario(id);
+        Integer usos = jdbc.queryForObject("""
+                select (select count(*) from venda where operador_id = ?)
+                     + (select count(*) from caixa where operador_abertura_id = ? or operador_fechamento_id = ?)
+                     + (select count(*) from movimentacao_caixa where operador_id = ?)
+                     + (select count(*) from lancamento_cliente where operador_id = ?)
+                     + (select count(*) from vale_troca where operador_id = ?)
+                     + (select count(*) from devolucao where operador_id = ?)
+                """, Integer.class, id, id, id, id, id, id, id);
+        if (usos == null || usos == 0) {
+            usuarios.delete(u);
+            return Exclusao.apagado("Operador");
+        }
+        String nome = u.getNome() + " (excluído " + id + ")";
+        u.setNome(nome.length() > 60 ? nome.substring(nome.length() - 60) : nome);
+        u.setAtivo(false);
+        u.setExcluido(true);
+        return Exclusao.arquivado("Operador");
     }
 
     @Scheduled(fixedDelay = 3_600_000)

@@ -62,6 +62,8 @@ public class Produto {
     private BigDecimal estoqueMinimo;
 
     private boolean ativo = true;
+    /** Excluído com histórico de vendas: some das telas e libera o GTIN e o código interno. */
+    private boolean excluido;
     private OffsetDateTime criadoEm;
     private OffsetDateTime atualizadoEm;
 

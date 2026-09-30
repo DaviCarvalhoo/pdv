@@ -8,6 +8,7 @@
 
 package br.com.balcao.pdv.produto;
 
+import br.com.balcao.pdv.comum.Exclusao;
 import br.com.balcao.pdv.usuario.Papel;
 import br.com.balcao.pdv.usuario.Requer;
 import jakarta.validation.Valid;
@@ -92,6 +93,12 @@ public class ProdutoController {
     @PatchMapping("/{id}/desativar")
     public ProdutoResponse desativar(@PathVariable Long id) {
         return ProdutoResponse.de(service.desativar(id));
+    }
+
+    @Requer(Papel.GERENTE)
+    @DeleteMapping("/{id}")
+    public Exclusao excluir(@PathVariable Long id) {
+        return service.excluir(id);
     }
 
     @Requer(Papel.GERENTE)

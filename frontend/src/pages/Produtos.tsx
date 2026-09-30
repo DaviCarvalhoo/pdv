@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import BotaoExcluir from '../components/BotaoExcluir';
 import Painel from '../components/Painel';
 import { api, type Categoria, type MovimentacaoEstoque, type Page, type Produto, type ProdutoRequest } from '../lib/api';
 import { useAtalhos, useAvisos, useSessao } from '../lib/contexto';
@@ -172,6 +173,10 @@ export default function PaginaProdutos() {
               carregar();
               setEditando(p);
             }}
+            aoExcluir={() => {
+              carregar();
+              setEditando(null);
+            }}
           />
         )}
       </Painel>
@@ -212,7 +217,7 @@ export default function PaginaProdutos() {
 
 // ---------------------------------------------------------------------------------------------
 
-function EdicaoProduto({ produto, categorias, podeEditar, aoSalvar }: { produto: Produto | null; categorias: Categoria[]; podeEditar: boolean; aoSalvar: (p: Produto) => void }) {
+function EdicaoProduto({ produto, categorias, podeEditar, aoSalvar, aoExcluir }: { produto: Produto | null; categorias: Categoria[]; podeEditar: boolean; aoSalvar: (p: Produto) => void; aoExcluir: () => void }) {
   const [aba, setAba] = useState<'dados' | 'estoque'>('dados');
   return (
     <>
@@ -227,7 +232,7 @@ function EdicaoProduto({ produto, categorias, podeEditar, aoSalvar }: { produto:
         </div>
       )}
       {aba === 'dados' ? (
-        <FormProduto produto={produto} categorias={categorias} podeEditar={podeEditar} aoSalvar={aoSalvar} />
+        <FormProduto produto={produto} categorias={categorias} podeEditar={podeEditar} aoSalvar={aoSalvar} aoExcluir={aoExcluir} />
       ) : (
         <Estoque produto={produto!} podeEditar={podeEditar} aoMudar={aoSalvar} />
       )}
@@ -235,7 +240,7 @@ function EdicaoProduto({ produto, categorias, podeEditar, aoSalvar }: { produto:
   );
 }
 
-function FormProduto({ produto, categorias, podeEditar, aoSalvar }: { produto: Produto | null; categorias: Categoria[]; podeEditar: boolean; aoSalvar: (p: Produto) => void }) {
+function FormProduto({ produto, categorias, podeEditar, aoSalvar, aoExcluir }: { produto: Produto | null; categorias: Categoria[]; podeEditar: boolean; aoSalvar: (p: Produto) => void; aoExcluir: () => void }) {
   const { avisar, erro } = useAvisos();
   const [f, setF] = useState({
     nome: produto?.nome ?? '',
@@ -422,9 +427,22 @@ function FormProduto({ produto, categorias, podeEditar, aoSalvar }: { produto: P
         <div className="formulario__cheio acoes__linha">
           <button className="botao botao--principal">{produto ? 'Salvar alterações' : 'Cadastrar'}</button>
           {produto && (
-            <button type="button" className={`botao botao--fantasma ${produto.ativo ? 'botao--perigo' : ''}`} onClick={alternarAtivo}>
+            <button type="button" className="botao botao--fantasma" onClick={alternarAtivo}>
               {produto.ativo ? 'Desativar' : 'Reativar'}
             </button>
+          )}
+          {produto && (
+            <BotaoExcluir
+              oque="do produto"
+              aoExcluir={async () => {
+                try {
+                  avisar((await api.excluirProduto(produto.id)).mensagem);
+                  aoExcluir();
+                } catch (err) {
+                  erro(err);
+                }
+              }}
+            />
           )}
         </div>
       )}
@@ -548,14 +566,15 @@ function Categorias({ categorias, aoMudar }: { categorias: Categoria[]; aoMudar:
         <input required placeholder="Nova categoria" maxLength={40} value={nome} onChange={(e) => setNome(e.target.value)} />
         <button className="botao botao--principal">Criar</button>
       </form>
+      <p className="dica">Ao excluir uma categoria, os produtos dela ficam sem categoria. Nenhum produto é apagado.</p>
       <ul className="lista-simples">
         {categorias.map((c) => (
           <li key={c.id}>
             <i className="ponto-cor" style={{ background: c.cor }} />
             <span>{c.nome}</span>
-            <button
-              className="link link--perigo"
-              onClick={async () => {
+            <BotaoExcluir
+              oque="da categoria"
+              aoExcluir={async () => {
                 try {
                   await api.excluirCategoria(c.id);
                   aoMudar();
@@ -563,9 +582,7 @@ function Categorias({ categorias, aoMudar }: { categorias: Categoria[]; aoMudar:
                   erro(err);
                 }
               }}
-            >
-              Excluir
-            </button>
+            />
           </li>
         ))}
       </ul>

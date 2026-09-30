@@ -33,6 +33,8 @@ public class Usuario {
 
     private String pinHash;
     private boolean ativo = true;
+    /** Excluído com histórico: some das telas, mas as vendas antigas continuam apontando para ele. */
+    private boolean excluido;
     private OffsetDateTime criadoEm;
     private OffsetDateTime ultimoAcesso;
 

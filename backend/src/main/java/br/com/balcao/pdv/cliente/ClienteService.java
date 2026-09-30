@@ -13,12 +13,14 @@ import br.com.balcao.pdv.caixa.CaixaService;
 import br.com.balcao.pdv.comum.ConflitoException;
 import br.com.balcao.pdv.comum.Dinheiro;
 import br.com.balcao.pdv.comum.Documento;
+import br.com.balcao.pdv.comum.Exclusao;
 import br.com.balcao.pdv.comum.NaoEncontradoException;
 import br.com.balcao.pdv.comum.RegraNegocioException;
 import br.com.balcao.pdv.venda.FormaPagamento;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,6 +39,7 @@ public class ClienteService {
     private final LancamentoClienteRepository lancamentos;
     private final CaixaService caixaService;
     private final Clock relogio;
+    private final JdbcTemplate jdbc;
 
     public record ClienteRequest(String nome, String documento, String telefone, String email,
                                  BigDecimal limiteCredito, String observacao, Boolean ativo) {
@@ -136,6 +139,29 @@ public class ClienteService {
         }
         return registrar(c, LancamentoCliente.Tipo.PAGAMENTO, v, forma.name(), null, operadorId,
                 StringUtils.hasText(observacao) ? observacao.trim() : "Pagamento em " + forma.name().toLowerCase());
+    }
+
+    /** Exclui o cliente. Com dívida no fiado, não deixa. Com compras antigas, some das telas e libera o CPF. */
+    @Transactional
+    public Exclusao excluir(Long id) {
+        Cliente c = travar(id);
+        if (c.getSaldoDevedor().signum() > 0) {
+            throw new RegraNegocioException("CLIENTE_COM_DIVIDA",
+                    c.getNome() + " ainda deve " + c.getSaldoDevedor() + " no fiado. Receba ou acerte antes de excluir.");
+        }
+        Integer usos = jdbc.queryForObject("""
+                select (select count(*) from venda where cliente_id = ?)
+                     + (select count(*) from lancamento_cliente where cliente_id = ?)
+                     + (select count(*) from vale_troca where cliente_id = ?)
+                """, Integer.class, id, id, id);
+        if (usos == null || usos == 0) {
+            repository.delete(c);
+            return Exclusao.apagado("Cliente");
+        }
+        c.setAtivo(false);
+        c.setExcluido(true);
+        c.setDocumento(null);
+        return Exclusao.arquivado("Cliente");
     }
 
     @Transactional(readOnly = true)

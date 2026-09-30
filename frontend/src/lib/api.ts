@@ -451,6 +451,12 @@ export interface Danfe {
   operador?: string;
 }
 
+/** Resultado de uma exclusão: apagado de vez, ou arquivado para preservar o histórico. */
+export interface Exclusao {
+  apagado: boolean;
+  mensagem: string;
+}
+
 /** Erro no formato Problem Details do backend. */
 export class ApiError extends Error {
   constructor(
@@ -553,6 +559,7 @@ export const api = {
   criarUsuario: (u: { nome: string; papel: Papel; pin: string }) => request<Usuario>('POST', '/usuarios', u),
   atualizarUsuario: (id: number, u: { nome: string; papel: Papel; ativo: boolean }) =>
     request<Usuario>('PUT', `/usuarios/${id}`, u),
+  excluirUsuario: (id: number) => request<Exclusao>('DELETE', `/usuarios/${id}`),
   redefinirPin: (id: number, pin: string) => request<void>('PUT', `/usuarios/${id}/pin`, { pin }),
 
   // Loja
@@ -571,6 +578,7 @@ export const api = {
   criarProduto: (p: ProdutoRequest) => request<Produto>('POST', '/produtos', p),
   atualizarProduto: (id: number, p: ProdutoRequest) => request<Produto>('PUT', `/produtos/${id}`, p),
   desativarProduto: (id: number) => request<Produto>('PATCH', `/produtos/${id}/desativar`),
+  excluirProduto: (id: number) => request<Exclusao>('DELETE', `/produtos/${id}`),
   reativarProduto: (id: number) => request<Produto>('PATCH', `/produtos/${id}/reativar`),
   entradaEstoque: (id: number, quantidade: number, observacao?: string) =>
     request<MovimentacaoEstoque>('POST', `/produtos/${id}/estoque/entradas`, { quantidade, observacao }),
@@ -592,6 +600,7 @@ export const api = {
   cliente: (id: number) => request<Cliente>('GET', `/clientes/${id}`),
   salvarCliente: (id: number | null, c: Partial<Cliente>) =>
     id ? request<Cliente>('PUT', `/clientes/${id}`, c) : request<Cliente>('POST', '/clientes', c),
+  excluirCliente: (id: number) => request<Exclusao>('DELETE', `/clientes/${id}`),
   extratoCliente: (id: number) => request<Page<LancamentoCliente>>('GET', `/clientes/${id}/extrato`),
   receberCliente: (id: number, valor: number, forma: FormaPagamento, observacao?: string) =>
     request<LancamentoCliente>('POST', `/clientes/${id}/recebimentos`, { valor, forma, observacao }),

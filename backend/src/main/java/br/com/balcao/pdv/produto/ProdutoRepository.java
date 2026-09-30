@@ -43,7 +43,8 @@ public interface ProdutoRepository extends JpaRepository<Produto, Long> {
 
     @Query("""
             select p from Produto p
-            where (:ativo is null or p.ativo = :ativo)
+            where p.excluido = false
+              and (:ativo is null or p.ativo = :ativo)
               and (:termo is null
                    or lower(p.nome) like lower(concat('%', cast(:termo as string), '%'))
                    or p.gtin = :termo or p.codigoInterno = :termo)

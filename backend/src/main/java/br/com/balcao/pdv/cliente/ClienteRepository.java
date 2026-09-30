@@ -26,7 +26,8 @@ public interface ClienteRepository extends JpaRepository<Cliente, Long> {
 
     @Query("""
             select c from Cliente c
-            where (:ativo is null or c.ativo = :ativo)
+            where c.excluido = false
+              and (:ativo is null or c.ativo = :ativo)
               and (:devedores = false or c.saldoDevedor > 0)
               and (:termo is null
                    or lower(c.nome) like lower(concat('%', cast(:termo as string), '%'))

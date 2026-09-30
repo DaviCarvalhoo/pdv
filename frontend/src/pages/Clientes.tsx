@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import BotaoExcluir from '../components/BotaoExcluir';
 import Painel from '../components/Painel';
 import { api, type Cliente, type FormaPagamento, type LancamentoCliente, type Page } from '../lib/api';
 import { useAtalhos, useAvisos, useCaixa, useSessao } from '../lib/contexto';
@@ -110,6 +111,10 @@ export default function PaginaClientes() {
               carregar();
               setAberto(c);
             }}
+            aoExcluir={() => {
+              carregar();
+              setAberto(null);
+            }}
           />
         )}
       </Painel>
@@ -117,7 +122,7 @@ export default function PaginaClientes() {
   );
 }
 
-function DetalheCliente({ cliente, aoMudar }: { cliente: Cliente | null; aoMudar: (c: Cliente) => void }) {
+function DetalheCliente({ cliente, aoMudar, aoExcluir }: { cliente: Cliente | null; aoMudar: (c: Cliente) => void; aoExcluir: () => void }) {
   const [aba, setAba] = useState<'conta' | 'dados'>(cliente ? 'conta' : 'dados');
   return (
     <>
@@ -131,12 +136,12 @@ function DetalheCliente({ cliente, aoMudar }: { cliente: Cliente | null; aoMudar
           </button>
         </div>
       )}
-      {aba === 'dados' ? <FormCliente cliente={cliente} aoSalvar={aoMudar} /> : <Conta cliente={cliente!} aoMudar={aoMudar} />}
+      {aba === 'dados' ? <FormCliente cliente={cliente} aoSalvar={aoMudar} aoExcluir={aoExcluir} /> : <Conta cliente={cliente!} aoMudar={aoMudar} />}
     </>
   );
 }
 
-function FormCliente({ cliente, aoSalvar }: { cliente: Cliente | null; aoSalvar: (c: Cliente) => void }) {
+function FormCliente({ cliente, aoSalvar, aoExcluir }: { cliente: Cliente | null; aoSalvar: (c: Cliente) => void; aoExcluir: () => void }) {
   const { avisar, erro } = useAvisos();
   const { pode } = useSessao();
   const [f, setF] = useState({
@@ -190,8 +195,21 @@ function FormCliente({ cliente, aoSalvar }: { cliente: Cliente | null; aoSalvar:
         Observação
         <input maxLength={255} {...campo('observacao')} />
       </label>
-      <div className="formulario__cheio">
+      <div className="formulario__cheio acoes__linha">
         <button className="botao botao--principal">{cliente ? 'Salvar' : 'Cadastrar'}</button>
+        {cliente && pode('GERENTE') && (
+          <BotaoExcluir
+            oque="do cliente"
+            aoExcluir={async () => {
+              try {
+                avisar((await api.excluirCliente(cliente.id)).mensagem);
+                aoExcluir();
+              } catch (err) {
+                erro(err);
+              }
+            }}
+          />
+        )}
       </div>
     </form>
   );

@@ -18,7 +18,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 ![React 18](https://img.shields.io/badge/React-18-149eca?style=flat-square)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178c6?style=flat-square)
 ![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square)
-![Testes](https://img.shields.io/badge/testes-57%20passando-2e7d32?style=flat-square)
+![Testes](https://img.shields.io/badge/testes-62%20passando-2e7d32?style=flat-square)
 ![Licença](https://img.shields.io/badge/licen%C3%A7a-propriet%C3%A1ria-d9482b?style=flat-square)
 
 <img src="docs/telas/04-pdv-venda.png" alt="Tela de venda do Balcão PDV" width="920">
@@ -51,7 +51,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 | **Seguro** | Operadores com PIN e perfis. Cancelar, estornar, sangria e desconto alto pedem o PIN do gerente. |
 | **Completo** | Fiado com limite, PIX com QR Code, vale-alimentação, troca com vale-troca, promoções, entrada de nota por XML, curva ABC. |
 | **Fiscal pronto** | NFC-e modelo 65 com chave, XML 4.00, QR Code, DANFE e cancelamento. O emissor é plugável. |
-| **Confiável** | Regras de negócio no domínio, transações atômicas, 57 testes automatizados com PostgreSQL real. |
+| **Confiável** | Regras de negócio no domínio, transações atômicas, 62 testes automatizados com PostgreSQL real. |
 
 ---
 
@@ -150,6 +150,7 @@ Mercadinho, padaria, conveniência, hortifrúti, loja de roupa: do leitor de có
 - **Autorização do gerente** de uso único para ações sensíveis
 - Bloqueio após 5 PINs errados
 - Identidade da loja (nome, logo, cor, frase, mensagem do cupom)
+- **Excluir** operadores, produtos, clientes e categorias. O que nunca foi usado é apagado. O que tem histórico sai das telas, libera nome, código de barras e CPF, e as vendas antigas continuam intactas. Vendas, notas e caixas fechados não são excluídos, por serem registro fiscal
 - Configuração fiscal da NFC-e
 </details>
 
@@ -293,13 +294,14 @@ cd backend
 mvn test
 ```
 
-**57 testes**, entre unitários e de integração com **PostgreSQL real via Testcontainers**:
+**62 testes**, entre unitários e de integração com **PostgreSQL real via Testcontainers**:
 
 - regras da venda: troco, pagamento dividido, desconto rateado, limite do fiado, imutabilidade;
 - fluxos completos: finalização, caixa, estoque, NFC-e, estorno, troca e vale-troca;
 - segurança: login por PIN, perfis, autorização de uso único, bloqueio por tentativas;
 - fiscal: chave de acesso (módulo 11), QR Code v2, XML com `vDesc` e `vTotTrib`;
 - PIX: BR Code conferido com o exemplo oficial do Banco Central;
+- exclusão de cadastros: com e sem histórico, proteção do próprio usuário, do último administrador e de cliente com dívida;
 - autoria: verificação dos avisos em todos os arquivos.
 
 ---

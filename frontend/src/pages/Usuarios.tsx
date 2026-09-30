@@ -7,6 +7,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import BotaoExcluir from '../components/BotaoExcluir';
 import Painel from '../components/Painel';
 import { api, type Papel, type Usuario } from '../lib/api';
 import { useAvisos, useSessao } from '../lib/contexto';
@@ -72,6 +73,7 @@ export default function PaginaUsuarios() {
           <FormUsuario
             key={aberto === 'novo' ? 'novo' : aberto.id}
             usuario={aberto === 'novo' ? null : aberto}
+            souEu={aberto !== 'novo' && aberto.id === operador?.id}
             aoSalvar={() => {
               carregar();
               setAberto(null);
@@ -83,7 +85,7 @@ export default function PaginaUsuarios() {
   );
 }
 
-function FormUsuario({ usuario, aoSalvar }: { usuario: Usuario | null; aoSalvar: () => void }) {
+function FormUsuario({ usuario, souEu, aoSalvar }: { usuario: Usuario | null; souEu?: boolean; aoSalvar: () => void }) {
   const { avisar, erro } = useAvisos();
   const [nome, setNome] = useState(usuario?.nome ?? '');
   const [papel, setPapel] = useState<Papel>(usuario?.papel ?? 'OPERADOR');
@@ -142,8 +144,21 @@ function FormUsuario({ usuario, aoSalvar }: { usuario: Usuario | null; aoSalvar:
           Ativo (pode entrar)
         </label>
       )}
-      <div className="formulario__cheio">
+      <div className="formulario__cheio acoes__linha">
         <button className="botao botao--principal">{usuario ? 'Salvar' : 'Cadastrar'}</button>
+        {usuario && !souEu && (
+          <BotaoExcluir
+            oque="do operador"
+            aoExcluir={async () => {
+              try {
+                avisar((await api.excluirUsuario(usuario.id)).mensagem);
+                aoSalvar();
+              } catch (err) {
+                erro(err);
+              }
+            }}
+          />
+        )}
       </div>
     </form>
   );

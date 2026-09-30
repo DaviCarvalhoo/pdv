@@ -8,6 +8,7 @@
 
 package br.com.balcao.pdv.cliente;
 
+import br.com.balcao.pdv.comum.Exclusao;
 import br.com.balcao.pdv.usuario.Contexto;
 import br.com.balcao.pdv.usuario.Papel;
 import br.com.balcao.pdv.usuario.Requer;
@@ -105,6 +106,12 @@ public class ClienteController {
     public LancamentoResponse receber(@PathVariable Long id, @Valid @RequestBody RecebimentoRequest req) {
         return LancamentoResponse.de(service.receber(id, req.valor(), req.forma(), req.observacao(),
                 contexto.operadorId()));
+    }
+
+    @Requer(Papel.GERENTE)
+    @DeleteMapping("/{id}")
+    public Exclusao excluir(@PathVariable Long id) {
+        return service.excluir(id);
     }
 
     @Requer(Papel.GERENTE)

@@ -17,7 +17,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
-import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -30,6 +30,7 @@ import java.util.List;
 public class CategoriaController {
 
     private final CategoriaRepository repository;
+    private final JdbcTemplate jdbc;
 
     public record CategoriaRequest(@NotBlank @Size(max = 40) String nome,
                                    @Pattern(regexp = "#[0-9A-Fa-f]{6}", message = "Cor no formato #RRGGBB") String cor) {
@@ -63,13 +64,14 @@ public class CategoriaController {
     @DeleteMapping("/{id}")
     @Requer(Papel.GERENTE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Transactional
     public void excluir(@PathVariable Long id) {
-        try {
-            repository.deleteById(id);
-            repository.flush();
-        } catch (DataIntegrityViolationException e) {
-            throw new ConflitoException("CATEGORIA_EM_USO", "Há produtos nesta categoria. Mova-os antes de excluir.");
+        if (!repository.existsById(id)) {
+            throw new NaoEncontradoException("Categoria", id);
         }
+        // Os produtos da categoria ficam "sem categoria"; nada é apagado junto.
+        jdbc.update("update produto set categoria_id = null where categoria_id = ?", id);
+        repository.deleteById(id);
     }
 
     private void exigirNomeUnico(String nome, Long id) {

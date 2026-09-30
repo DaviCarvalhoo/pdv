@@ -41,6 +41,8 @@ public class Cliente {
 
     private String observacao;
     private boolean ativo = true;
+    /** Excluído com histórico: some das telas e libera o CPF/CNPJ para um novo cadastro. */
+    private boolean excluido;
     private OffsetDateTime criadoEm;
 
     @Version

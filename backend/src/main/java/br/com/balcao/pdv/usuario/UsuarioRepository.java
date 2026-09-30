@@ -17,7 +17,7 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
     List<Usuario> findByAtivoTrueOrderByNome();
 
-    List<Usuario> findAllByOrderByAtivoDescNome();
+    List<Usuario> findByExcluidoFalseOrderByAtivoDescNome();
 
     List<Usuario> findByAtivoTrueAndPapelIn(Collection<Papel> papeis);
 
