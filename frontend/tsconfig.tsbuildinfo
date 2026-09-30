@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/components/danfe.tsx","./src/components/extratocaixa.tsx","./src/components/painel.tsx","./src/lib/api.ts","./src/lib/contexto.tsx","./src/lib/format.ts","./src/pages/caixa.tsx","./src/pages/fiscal.tsx","./src/pages/pdv.tsx","./src/pages/produtos.tsx","./src/pages/vendas.tsx","./vite.config.ts"],"version":"5.6.3"}
