@@ -1,0 +1,21 @@
+# Java / Maven
+backend/target/
+*.class
+*.log
+
+# Node / Vite
+frontend/node_modules/
+frontend/dist/
+
+# IDEs e SO
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Segredos (certificado A1, variáveis locais)
+*.pfx
+*.p12
+.env
+.env.local
