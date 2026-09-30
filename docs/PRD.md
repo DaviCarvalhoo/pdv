@@ -449,7 +449,6 @@ A lista original cobre o ciclo básico da venda. Comparando com os PDVs mais usa
 | M11 | **Categorias** de produto | Organizar cadastro e relatórios | ✅ Fase 9 |
 | M12 | **Curva ABC** de produtos | Saber o que não pode faltar na prateleira | ✅ Fase 10 |
 | M13 | **Alerta de sangria** (limite de dinheiro na gaveta) | Segurança: menos dinheiro exposto | ✅ Fase 9 |
-| M14 | **Canal de sugestões** dentro do sistema | O cliente pede melhorias sem sair do PDV | ✅ Fase 12 |
 | M15 | Troca e devolução com vale-troca | Comum em loja de roupa e presentes | Backlog (P1) |
 | M16 | Orçamento / pré-venda (vendedor monta, caixa recebe) | Lojas com balcão e caixa separados | Backlog (P1) |
 | M17 | PIX com QR Code dinâmico (integração com banco/PSP) e baixa automática | Elimina conferência manual do PIX | Backlog (P1) |
@@ -497,10 +496,3 @@ A lista original cobre o ciclo básico da venda. Comparando com os PDVs mais usa
 | RF-CLI-03 | Pagamento em crediário exige cliente e respeita o limite (`saldo devedor + valor ≤ limite`). |
 | RF-CLI-04 | Conta corrente do cliente: compras, pagamentos e estornos, com saldo devedor. |
 | RF-CLI-05 | Recebimento de fiado em qualquer forma. Em dinheiro, entra no caixa como `RECEBIMENTO_CLIENTE`. |
-
-### Fase 12 — Sugestões
-
-| ID | Requisito |
-|---|---|
-| RF-SUG-01 | Qualquer usuário registra sugestões (título, descrição, área do sistema). |
-| RF-SUG-02 | Admin muda o status: `NOVA`, `EM_ANALISE`, `PLANEJADA`, `FEITA`, `DESCARTADA`, com resposta. |
