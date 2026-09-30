@@ -1,11 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Marca from '../components/Marca';
 import { api, ApiError, type Operador } from '../lib/api';
 import { useSessao } from '../lib/contexto';
 import { iniciais, nomePapel } from '../lib/format';
 
 export default function Login() {
-  const { entrar, loja } = useSessao();
+  const { entrar: guardar, loja } = useSessao();
+  const navegar = useNavigate();
+  // Depois de entrar, começa pela tela inicial do perfil (e não pela última tela do operador anterior).
+  const entrar: typeof guardar = (s) => {
+    guardar(s);
+    navegar('/', { replace: true });
+  };
   const [estado, setEstado] = useState<{ precisaPrimeiroAcesso: boolean; operadores: Operador[] } | null>(null);
   const [falha, setFalha] = useState('');
 

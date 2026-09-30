@@ -85,8 +85,12 @@ public class DadosDemonstracao implements ApplicationRunner {
         } finally {
             relogio.voltarAoPresente();
         }
-        // Caixa de hoje já aberto, pronto para vender.
-        caixaService.abrir(new BigDecimal("150.00"), equipe.get(2).getId());
+        // Caixa de hoje aberto desde as 7h, com as vendas até agora, pronto para continuar vendendo.
+        try {
+            hoje(equipe, produtos, clientes);
+        } finally {
+            relogio.voltarAoPresente();
+        }
         log.info("Perfil demo pronto em {} s", (System.currentTimeMillis() - inicio) / 1000);
     }
 
@@ -209,6 +213,27 @@ public class DadosDemonstracao implements ApplicationRunner {
             BigDecimal diferenca = sorteio < 7 ? BigDecimal.ZERO
                     : BigDecimal.valueOf(aleatorio.nextInt(900) - 450, 2);
             caixaService.fechar(caixa.getId(), esperado.add(diferenca).max(BigDecimal.ZERO), operador.getId());
+        }
+    }
+
+    private void hoje(List<Usuario> equipe, List<Produto> produtos, List<Cliente> clientes) {
+        ZoneId zona = ZoneId.systemDefault();
+        var agora = java.time.LocalDateTime.now();
+        Usuario operador = equipe.get(2);
+        relogio.irPara(agora.toLocalDate().atTime(7, 0).atZone(zona).toInstant());
+        caixaService.abrir(new BigDecimal("150.00"), operador.getId());
+        int[] pesoHora = {0, 0, 0, 0, 0, 0, 0, 3, 5, 4, 4, 6, 8, 6, 4, 4, 5, 8, 9, 7, 4, 2, 0, 0};
+        List<java.time.LocalDateTime> momentos = new ArrayList<>();
+        for (int i = 0; i < 40; i++) {
+            var m = agora.toLocalDate().atTime(sortearHora(pesoHora), aleatorio.nextInt(60), aleatorio.nextInt(60));
+            if (m.isBefore(agora.minusMinutes(5))) {
+                momentos.add(m);
+            }
+        }
+        momentos.sort(null);
+        for (var m : momentos) {
+            relogio.irPara(m.atZone(zona).toInstant());
+            venda(operador, produtos, clientes);
         }
     }
 

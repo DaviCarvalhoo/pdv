@@ -125,10 +125,10 @@ class RecursosDeBalcaoIntegracaoTest extends IntegracaoBase {
         Long v2 = vendaService.iniciar().id();
         vendaService.adicionarItem(v2, refri.getId(), null, new BigDecimal("3"));
         vendaService.vincularCliente(v2, maria.getId());
-        vendaService.adicionarPagamento(v2, FormaPagamento.CREDIARIO, new BigDecimal("30"), null);
-        assertThatThrownBy(() -> vendaService.finalizar(v2))
+        assertThatThrownBy(() -> vendaService.adicionarPagamento(v2, FormaPagamento.CREDIARIO, new BigDecimal("30"), null))
                 .isInstanceOf(RegraNegocioException.class)
                 .extracting("codigo").isEqualTo("LIMITE_CREDITO_EXCEDIDO");
+        vendaService.adicionarPagamento(v2, FormaPagamento.CREDIARIO, new BigDecimal("20"), null); // cabe no limite
 
         var caixa = caixaService.exigirAberto();
         clienteService.receber(maria.getId(), new BigDecimal("10"), FormaPagamento.DINHEIRO, null, null);

@@ -224,6 +224,15 @@ public class Venda {
                             + "Só o dinheiro gera troco.",
                     Map.of("restante", restante));
         }
+        if (forma == FormaPagamento.CREDIARIO) {
+            // Avisa já no lançamento; a finalização confere de novo, com a conta travada.
+            BigDecimal disponivel = cliente.getCreditoDisponivel().subtract(totalPorForma(FormaPagamento.CREDIARIO));
+            if (v.compareTo(disponivel) > 0) {
+                throw new RegraNegocioException("LIMITE_CREDITO_EXCEDIDO",
+                        cliente.getNome() + " tem " + disponivel.max(Dinheiro.ZERO) + " de crédito disponível no fiado.",
+                        Map.of("disponivel", disponivel.max(Dinheiro.ZERO)));
+            }
+        }
         Pagamento pagamento = new Pagamento(this, forma, v, identificador, agora);
         pagamentos.add(pagamento);
         recalcular();

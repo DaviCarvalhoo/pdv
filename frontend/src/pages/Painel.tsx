@@ -174,6 +174,7 @@ function Kpi({ titulo, valor, atual, anterior, nota, principal }: { titulo: stri
 }
 
 function notaLucro(r: Resumo) {
+  if (r.vendas === 0) return undefined;
   if (r.margem == null) return 'Cadastre o custo dos produtos para ver o lucro.';
   const cobertura = r.coberturaCusto != null && r.coberturaCusto < 100 ? ` · ${r.coberturaCusto}% das vendas com custo` : '';
   return `Margem ${pct(r.margem)}${cobertura}`;
@@ -184,11 +185,12 @@ function Alertas({ painel }: { painel: Painel }) {
   const itens: { texto: string; link: string; tipo: 'alerta' | 'info' }[] = [];
   if (a.gaveta != null && a.limiteGaveta != null && a.gaveta > a.limiteGaveta)
     itens.push({ texto: `Gaveta com ${moeda(a.gaveta)}: acima do limite, faça sangria`, link: '/caixa', tipo: 'alerta' });
-  if (a.estoqueZerado > 0) itens.push({ texto: `${a.estoqueZerado} produtos sem estoque`, link: '/produtos', tipo: 'alerta' });
-  if (a.estoqueBaixo > 0) itens.push({ texto: `${a.estoqueBaixo} produtos abaixo do mínimo`, link: '/produtos', tipo: 'info' });
-  if (a.notasComProblema > 0) itens.push({ texto: `${a.notasComProblema} NFC-e rejeitadas ou pendentes`, link: '/fiscal', tipo: 'alerta' });
+  const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
+  if (a.estoqueZerado > 0) itens.push({ texto: plural(a.estoqueZerado, 'produto sem estoque', 'produtos sem estoque'), link: '/produtos', tipo: 'alerta' });
+  if (a.estoqueBaixo > 0) itens.push({ texto: plural(a.estoqueBaixo, 'produto abaixo do mínimo', 'produtos abaixo do mínimo'), link: '/produtos', tipo: 'info' });
+  if (a.notasComProblema > 0) itens.push({ texto: plural(a.notasComProblema, 'NFC-e rejeitada ou pendente', 'NFC-e rejeitadas ou pendentes'), link: '/fiscal', tipo: 'alerta' });
   if (a.fiadoAReceber > 0) itens.push({ texto: `${moeda(a.fiadoAReceber)} de fiado a receber`, link: '/clientes', tipo: 'info' });
-  if (a.vendasEmEspera > 0) itens.push({ texto: `${a.vendasEmEspera} vendas em espera no caixa`, link: '/pdv', tipo: 'info' });
+  if (a.vendasEmEspera > 0) itens.push({ texto: plural(a.vendasEmEspera, 'venda em espera no caixa', 'vendas em espera no caixa'), link: '/pdv', tipo: 'info' });
   if (itens.length === 0) return null;
   return (
     <ul className="alertas-painel" aria-label="Pontos de atenção">

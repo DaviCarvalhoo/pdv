@@ -2871,6 +2871,7 @@ label.alternador {
 
 .grafico {
   position: relative;
+  padding-right: 4.4rem;
 }
 
 .grafico__area {
@@ -2894,8 +2895,10 @@ label.alternador {
 
 .grafico__grade span {
   position: absolute;
-  right: 0;
-  top: -1.2em;
+  right: -4.4rem;
+  width: 4.1rem;
+  text-align: right;
+  top: -0.7em;
   font-size: 0.68rem;
   color: var(--tinta-3);
 }
