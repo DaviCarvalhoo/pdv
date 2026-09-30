@@ -35,6 +35,8 @@ public class ItemVenda {
     private boolean promocional;
     private BigDecimal quantidade;
     private BigDecimal subtotal;
+    /** Quanto deste item já voltou em trocas/devoluções. */
+    private BigDecimal quantidadeDevolvida = BigDecimal.ZERO;
 
     ItemVenda(Venda venda, Produto produto, BigDecimal quantidade, LocalDate dia) {
         this.venda = venda;
@@ -44,6 +46,14 @@ public class ItemVenda {
         this.promocional = produto.emPromocao(dia);
         this.custoUnitario = produto.getPrecoCusto();
         alterarQuantidade(quantidade);
+    }
+
+    public BigDecimal getQuantidadeDevolvivel() {
+        return quantidade.subtract(quantidadeDevolvida);
+    }
+
+    void registrarDevolucao(BigDecimal qtd) {
+        this.quantidadeDevolvida = quantidadeDevolvida.add(qtd);
     }
 
     void alterarQuantidade(BigDecimal quantidade) {

@@ -432,7 +432,7 @@ export default function PaginaPdv() {
           <Pagamento
             venda={venda}
             ocupado={ocupado}
-            aoPagar={(forma, valor) => executar(() => api.pagar(venda.id, forma, valor))}
+            aoPagar={(forma, valor, identificador) => executar(() => api.pagar(venda.id, forma, valor, identificador))}
             aoRemover={(id) => executar(() => api.removerPagamento(venda.id, id))}
             aoFinalizar={finalizar}
             aoVoltar={() => {

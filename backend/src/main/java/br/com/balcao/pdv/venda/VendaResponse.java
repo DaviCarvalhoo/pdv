@@ -21,12 +21,14 @@ public record VendaResponse(
 
     public record Item(Long id, Long produtoId, String codigo, String descricao, String unidade,
                        BigDecimal precoUnitario, BigDecimal precoNormal, boolean promocional,
-                       BigDecimal quantidade, BigDecimal subtotal, BigDecimal estoqueDisponivel) {
+                       BigDecimal quantidade, BigDecimal subtotal, BigDecimal estoqueDisponivel,
+                       BigDecimal quantidadeDevolvida) {
         static Item de(ItemVenda i) {
             var p = i.getProduto();
             String codigo = p.getGtin() != null ? p.getGtin() : p.getCodigoInterno();
             return new Item(i.getId(), p.getId(), codigo, i.getDescricao(), p.getUnidade(), i.getPrecoUnitario(),
-                    p.getPreco(), i.isPromocional(), i.getQuantidade(), i.getSubtotal(), p.getEstoqueAtual());
+                    p.getPreco(), i.isPromocional(), i.getQuantidade(), i.getSubtotal(), p.getEstoqueAtual(),
+                    i.getQuantidadeDevolvida());
         }
     }
 

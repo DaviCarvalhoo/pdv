@@ -7,7 +7,8 @@ export type FormaPagamento =
   | 'CARTAO_CREDITO'
   | 'VALE_ALIMENTACAO'
   | 'VALE_REFEICAO'
-  | 'CREDIARIO';
+  | 'CREDIARIO'
+  | 'VALE_TROCA';
 export type StatusVenda = 'ABERTA' | 'FINALIZADA' | 'CANCELADA' | 'ESTORNADA';
 export type StatusNota = 'PENDENTE' | 'AUTORIZADA' | 'REJEITADA' | 'CANCELADA';
 export type Ambiente = 'PRODUCAO' | 'HOMOLOGACAO';
@@ -193,6 +194,16 @@ export interface ItemVenda {
   quantidade: number;
   subtotal: number;
   estoqueDisponivel: number;
+  quantidadeDevolvida: number;
+}
+
+export interface Devolucao {
+  devolucaoId: number;
+  vendaId: number;
+  valor: number;
+  destino: 'DINHEIRO' | 'VALE_TROCA';
+  codigoVale?: string;
+  dataHora: string;
 }
 
 export interface PagamentoVenda {
@@ -603,7 +614,7 @@ export const api = {
   removerItem: (id: number, itemId: number) => request<Venda>('DELETE', `/vendas/${id}/itens/${itemId}`),
   desconto: (id: number, valor?: number | null, percentual?: number | null) =>
     request<Venda>('PUT', `/vendas/${id}/desconto`, { valor, percentual }),
-  pagar: (id: number, forma: FormaPagamento, valor: number, identificadorTransacao?: string) =>
+  pagar: (id: number, forma: FormaPagamento, valor: number, identificadorTransacao?: string | null) =>
     request<Venda>('POST', `/vendas/${id}/pagamentos`, { forma, valor, identificadorTransacao }),
   removerPagamento: (id: number, pagamentoId: number) => request<Venda>('DELETE', `/vendas/${id}/pagamentos/${pagamentoId}`),
   pix: (id: number, valor?: number) => request<{ valor: number; payload: string }>('GET', `/vendas/${id}/pix` + qs({ valor })),
@@ -614,6 +625,11 @@ export const api = {
   finalizar: (id: number) => request<Venda>('POST', `/vendas/${id}/finalizar`),
   cancelarVenda: (id: number, motivo?: string) => request<Venda>('POST', `/vendas/${id}/cancelar`, { motivo }),
   estornarVenda: (id: number, motivo?: string) => request<Venda>('POST', `/vendas/${id}/estornar`, { motivo }),
+  devolver: (id: number, itens: { itemId: number; quantidade: number }[], destino: 'DINHEIRO' | 'VALE_TROCA', motivo?: string) =>
+    request<Devolucao>('POST', `/vendas/${id}/devolucoes`, { itens, destino, motivo }),
+  devolucoes: (id: number) => request<Devolucao[]>('GET', `/vendas/${id}/devolucoes`),
+  vale: (codigo: string) =>
+    request<{ codigo: string; valor: number; saldo: number; criadoEm: string }>('GET', `/vendas/vales/${encodeURIComponent(codigo.trim())}`),
   historico: (f: Record<string, string | number | undefined>) => request<Historico>('GET', '/vendas' + qs({ size: 20, ...f })),
 
   // Relatórios

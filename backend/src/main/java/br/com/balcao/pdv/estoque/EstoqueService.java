@@ -74,6 +74,13 @@ public class EstoqueService {
                 "Estorno da venda #" + vendaId);
     }
 
+    /** Item que voltou numa troca/devolução. Roda na transação da devolução. */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public MovimentacaoEstoque devolucao(Long produtoId, BigDecimal quantidade, Long vendaId) {
+        return movimentar(produtoId, TipoMovimentacaoEstoque.DEVOLUCAO, quantidade, vendaId,
+                "Devolução da venda #" + vendaId);
+    }
+
     @Transactional(readOnly = true)
     public Page<MovimentacaoEstoque> historico(Long produtoId, Pageable pageable) {
         if (!produtoRepository.existsById(produtoId)) {

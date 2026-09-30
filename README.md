@@ -26,6 +26,7 @@ Ponto de venda completo para loja de balcão (mercadinho, padaria, conveniência
 - **Entrada de mercadoria pelo XML da NF-e** do fornecedor (atualiza custo, cadastra o que falta, dá entrada no estoque)
 - Clientes e **fiado** com limite de crédito, conta corrente, recebimento e lembrete por WhatsApp
 - Histórico de vendas com filtros, estorno e exportação para Excel (CSV)
+- **Troca e devolução** parcial com **vale-troca** (código impresso, usado como pagamento no PDV) ou dinheiro de volta
 - **Curva ABC** de produtos com exportação
 
 **Administração**
@@ -85,7 +86,7 @@ mvn test   # unitários + integração com PostgreSQL real via Testcontainers (p
 | F4 · F10 | Receber · finalizar |
 | F8 | Cancelar venda |
 | ↑ ↓ · + − · Del | Escolher linha · mudar quantidade · remover |
-| D P B C A R F | Forma de pagamento (dinheiro, PIX, débito, crédito, VA, VR, fiado) |
+| D P B C A R F V | Forma de pagamento (dinheiro, PIX, débito, crédito, VA, VR, fiado, vale-troca) |
 | Enter · P | Nova venda · imprimir cupom (depois de finalizar) |
 
 ## Configuração

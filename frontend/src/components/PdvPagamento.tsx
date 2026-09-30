@@ -11,6 +11,7 @@ const FORMAS: { forma: FormaPagamento; tecla: string }[] = [
   { forma: 'VALE_ALIMENTACAO', tecla: 'A' },
   { forma: 'VALE_REFEICAO', tecla: 'R' },
   { forma: 'CREDIARIO', tecla: 'F' },
+  { forma: 'VALE_TROCA', tecla: 'V' },
 ];
 
 export default function Pagamento({
@@ -23,7 +24,7 @@ export default function Pagamento({
 }: {
   venda: Venda;
   ocupado: boolean;
-  aoPagar: (f: FormaPagamento, v: number) => Promise<Venda | null>;
+  aoPagar: (f: FormaPagamento, v: number, identificador?: string) => Promise<Venda | null>;
   aoRemover: (id: number) => void;
   aoFinalizar: () => void;
   aoVoltar: () => void;
@@ -32,6 +33,9 @@ export default function Pagamento({
   const [valor, setValor] = useState('');
   const [pix, setPix] = useState<{ valor: number; payload: string } | null>(null);
   const [pixErro, setPixErro] = useState('');
+  const [codigoVale, setCodigoVale] = useState('');
+  const [vale, setVale] = useState<{ codigo: string; saldo: number } | null>(null);
+  const [valeErro, setValeErro] = useState('');
   const campo = useRef<HTMLInputElement>(null);
   const quitada = venda.restante <= 0;
   const disponiveis = FORMAS.filter((f) => f.forma !== 'CREDIARIO' || venda.cliente);
@@ -63,13 +67,41 @@ export default function Pagamento({
     return () => clearTimeout(t);
   }, [forma, valorNum, venda.id]);
 
+  // Vale-troca: consulta o saldo pelo código e sugere o menor entre saldo e restante.
+  useEffect(() => {
+    if (forma !== 'VALE_TROCA' || codigoVale.trim().length < 8) {
+      setVale(null);
+      setValeErro('');
+      return;
+    }
+    const t = setTimeout(() => {
+      api
+        .vale(codigoVale)
+        .then((v) => {
+          setVale(v);
+          setValeErro(v.saldo > 0 ? '' : 'Vale sem saldo.');
+          if (v.saldo > 0) setValor(numero(Math.min(v.saldo, venda.restante)));
+        })
+        .catch(() => {
+          setVale(null);
+          setValeErro('Vale não encontrado.');
+        });
+    }, 250);
+    return () => clearTimeout(t);
+  }, [forma, codigoVale, venda.restante]);
+
   const escolher = (f: FormaPagamento) => {
     setForma(f);
-    campo.current?.focus();
+    if (f !== 'VALE_TROCA') campo.current?.focus();
   };
 
   const lancar = async () => {
     if (!Number.isFinite(valorNum) || valorNum <= 0) return;
+    if (forma === 'VALE_TROCA') {
+      if (!vale) return;
+      if (await aoPagar(forma, valorNum, vale.codigo)) setCodigoVale('');
+      return;
+    }
     await aoPagar(forma, valorNum);
   };
 
@@ -110,6 +142,22 @@ export default function Pagamento({
               Fiado de {venda.cliente.nome}: disponível {moeda(venda.cliente.creditoDisponivel)}.
             </p>
           )}
+          {forma === 'VALE_TROCA' && (
+            <div className="vale-campo">
+              <label htmlFor="codigo-vale">Código do vale-troca</label>
+              <input
+                id="codigo-vale"
+                autoFocus
+                placeholder="VT······"
+                maxLength={8}
+                value={codigoVale}
+                onChange={(e) => setCodigoVale(e.target.value.toUpperCase())}
+                onKeyDown={(e) => e.key === 'Enter' && vale && campo.current?.focus()}
+              />
+              {vale && vale.saldo > 0 && <span className="pagamento__ok">Saldo {moeda(vale.saldo)}</span>}
+              {valeErro && <span className="negativo">{valeErro}</span>}
+            </div>
+          )}
           <form
             className="pagamento__valor"
             onSubmit={(e) => {
@@ -129,7 +177,7 @@ export default function Pagamento({
                 onChange={(e) => setValor(e.target.value)}
                 onKeyDown={(e) => {
                   // Letras nunca fazem parte de um valor: trocam a forma sem atrapalhar a digitação.
-                  const f = disponiveis.find((x) => x.tecla === e.key.toUpperCase());
+                  const f = disponiveis.find((x) => x.tecla === e.key.toUpperCase() && e.key.length === 1);
                   if (f && !e.ctrlKey && !e.altKey && !e.metaKey) {
                     e.preventDefault();
                     escolher(f.forma);
@@ -168,7 +216,7 @@ export default function Pagamento({
               )}
             </div>
           )}
-          <p className="dica">D dinheiro · P PIX · B débito · C crédito · A/R vales{venda.cliente ? ' · F fiado' : ''}. Só dinheiro gera troco.</p>
+          <p className="dica">D dinheiro · P PIX · B débito · C crédito · A/R vales · V vale-troca{venda.cliente ? ' · F fiado' : ''}. Só dinheiro gera troco.</p>
         </>
       )}
 

@@ -3469,6 +3469,67 @@ label.alternador {
   font: 8px var(--fonte-mono);
 }
 
+/* Troca e vale-troca */
+
+.troca {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+  padding: 1rem;
+  background: var(--bobina);
+  border: 1px solid var(--linha-forte);
+  border-radius: var(--raio-grande);
+}
+
+.troca h3 {
+  margin: 0;
+}
+
+.vale-campo {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
+}
+
+.vale-campo label {
+  font-weight: 600;
+  color: var(--tinta-2);
+  font-size: 0.8rem;
+}
+
+.vale-campo input {
+  font: 600 1.2rem var(--fonte-mono);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.comprovante-vale {
+  width: 72mm;
+  margin: 0 auto;
+  padding: 5mm;
+  border: 1px dashed var(--tinta);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5mm;
+  font: 11px/1.4 var(--fonte-mono);
+  text-align: center;
+  background: white;
+  color: black;
+}
+
+.comprovante-vale strong {
+  font-size: 14px;
+  letter-spacing: 0.2em;
+}
+
+.comprovante-vale__codigo {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+}
+
 /* Avisos */
 
 .avisos {

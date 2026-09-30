@@ -135,6 +135,19 @@ public class CaixaService {
         }
     }
 
+    /** Dinheiro devolvido ao cliente numa devolução (sai da gaveta do caixa aberto). */
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void registrarDevolucao(Caixa caixa, BigDecimal valor, Long vendaId, Long operadorId) {
+        caixa.exigirAberto();
+        BigDecimal saldo = saldoEsperado(caixa);
+        if (Dinheiro.valor(valor).compareTo(saldo) > 0) {
+            throw new RegraNegocioException("SALDO_INSUFICIENTE",
+                    "Não há dinheiro suficiente na gaveta (" + saldo + "). Use o vale-troca.");
+        }
+        registrar(caixa, TipoMovimentacaoCaixa.ESTORNO_VENDA, valor, "Devolução da venda #" + vendaId, vendaId,
+                operadorId);
+    }
+
     /** Fiado recebido em dinheiro entra na gaveta. */
     @Transactional(propagation = Propagation.MANDATORY)
     public void registrarRecebimentoCliente(Caixa caixa, BigDecimal valor, String cliente, Long operadorId) {

@@ -54,6 +54,7 @@ public class VendaService {
     private final LojaService lojaService;
     private final UsuarioRepository usuarioRepository;
     private final NotaFiscalRepository notaRepository;
+    private final TrocaService trocaService;
     private final EntityManager entityManager;
     private final Clock relogio;
 
@@ -168,8 +169,12 @@ public class VendaService {
     public VendaResponse adicionarPagamento(Long vendaId, FormaPagamento forma, BigDecimal valor,
                                             String identificador) {
         Venda venda = buscar(vendaId);
-        venda.adicionarPagamento(forma, valor, StringUtils.hasText(identificador) ? identificador.trim() : null,
-                agora());
+        String ident = StringUtils.hasText(identificador) ? identificador.trim() : null;
+        if (forma == FormaPagamento.VALE_TROCA && ident != null) {
+            ident = TrocaService.normalizar(ident);
+            trocaService.validarUso(venda, ident, Dinheiro.valor(valor));
+        }
+        venda.adicionarPagamento(forma, valor, ident, agora());
         return salvar(venda);
     }
 
@@ -240,6 +245,7 @@ public class VendaService {
         if (fiado.signum() > 0) {
             clienteService.lancarCompra(venda.getCliente().getId(), fiado, venda.getId(), operadorId);
         }
+        trocaService.consumirVales(venda);
         venda.registrarTributos(Rateio.soma(Rateio.tributos(venda, lojaService.obter().getAliquotaTributos())));
         repository.saveAndFlush(venda);
         log.info("Venda #{} finalizada: total {}, pago {}, troco {}", venda.getId(), venda.getTotal(),
@@ -262,6 +268,10 @@ public class VendaService {
     @Transactional
     public VendaResponse estornar(Long vendaId, String motivo, Long operadorId) {
         Venda venda = buscar(vendaId);
+        if (trocaService.temDevolucao(vendaId)) {
+            throw new ConflitoException("VENDA_COM_DEVOLUCAO",
+                    "Esta venda já teve troca/devolução. Devolva os itens restantes pela troca.");
+        }
         if (notaRepository.existsByVendaIdAndStatus(vendaId, StatusNota.AUTORIZADA)) {
             throw new ConflitoException("NOTA_AUTORIZADA",
                     "Cancele a NFC-e autorizada desta venda antes de estornar.");
@@ -272,6 +282,7 @@ public class VendaService {
             estoqueService.estornoVenda(item.getProduto().getId(), item.getQuantidade(), venda.getId());
         }
         caixaService.registrarEstornoVenda(caixa, venda.getDinheiroLiquido(), venda.getId(), operadorId);
+        trocaService.devolverVales(venda);
         BigDecimal fiado = venda.totalPorForma(FormaPagamento.CREDIARIO);
         if (fiado.signum() > 0) {
             clienteService.lancarEstorno(venda.getCliente().getId(), fiado, venda.getId(), operadorId);

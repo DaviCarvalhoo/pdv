@@ -224,6 +224,9 @@ public class Venda {
                             + "Só o dinheiro gera troco.",
                     Map.of("restante", restante));
         }
+        if (forma == FormaPagamento.VALE_TROCA && (identificador == null || identificador.isBlank())) {
+            throw new RegraNegocioException("VALE_OBRIGATORIO", "Informe o código do vale-troca.");
+        }
         if (forma == FormaPagamento.CREDIARIO) {
             // Avisa já no lançamento; a finalização confere de novo, com a conta travada.
             BigDecimal disponivel = cliente.getCreditoDisponivel().subtract(totalPorForma(FormaPagamento.CREDIARIO));

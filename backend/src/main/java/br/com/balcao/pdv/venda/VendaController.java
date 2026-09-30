@@ -31,6 +31,7 @@ public class VendaController {
     private final VendaService service;
     private final NfceService nfceService;
     private final Contexto contexto;
+    private final TrocaService trocaService;
 
     public record ItemRequest(Long produtoId, @Size(max = 30) String codigo, BigDecimal quantidade) {
     }
@@ -56,6 +57,10 @@ public class VendaController {
     }
 
     public record MotivoRequest(@Size(max = 255) String motivo) {
+    }
+
+    public record DevolucaoRequest(java.util.List<TrocaService.ItemDevolvido> itens, Devolucao.Destino destino,
+                                   @Size(max = 255) String motivo) {
     }
 
     public record HistoricoResponse(Page<VendaResumo> vendas, VendaService.Totalizadores totalizadores) {
@@ -192,6 +197,25 @@ public class VendaController {
     public VendaResponse estornar(@PathVariable Long id, @Valid @RequestBody(required = false) MotivoRequest req) {
         contexto.exigirGerente("Estornar venda");
         return service.estornar(id, req != null ? req.motivo() : null, contexto.operadorId());
+    }
+
+    /** Troca/devolução parcial: o estoque volta e o cliente recebe vale-troca ou dinheiro. Exige gerente. */
+    @PostMapping("/{id}/devolucoes")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TrocaService.Resultado devolver(@PathVariable Long id, @Valid @RequestBody DevolucaoRequest req) {
+        contexto.exigirGerente("Troca/devolução");
+        return trocaService.devolver(id, req.itens(), req.destino(), req.motivo(), contexto.operadorId());
+    }
+
+    @GetMapping("/{id}/devolucoes")
+    public List<TrocaService.Resultado> devolucoes(@PathVariable Long id) {
+        return trocaService.devolucoes(id);
+    }
+
+    @GetMapping("/vales/{codigo}")
+    public Map<String, Object> vale(@PathVariable String codigo) {
+        ValeTroca v = trocaService.vale(codigo);
+        return Map.of("codigo", v.getCodigo(), "valor", v.getValor(), "saldo", v.getSaldo(), "criadoEm", v.getCriadoEm());
     }
 
     private static OffsetDateTime inicioDoDia(LocalDate data) {

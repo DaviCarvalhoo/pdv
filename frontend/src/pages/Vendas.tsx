@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from 'react';
 import Danfe from '../components/Danfe';
 import Painel from '../components/Painel';
-import { api, baixarArquivo, csv, type Danfe as DanfeDados, type Historico, type Venda } from '../lib/api';
+import { api, baixarArquivo, csv, type Danfe as DanfeDados, type Devolucao, type Historico, type Venda } from '../lib/api';
 import { useAvisos, useCaixa } from '../lib/contexto';
-import { dataHora, diasAtras, documento, hoje, moeda, nomeForma, nomeStatusVenda, qtd } from '../lib/format';
+import { dataHora, diasAtras, documento, hoje, moeda, nomeForma, nomeStatusVenda, parseValor, qtd } from '../lib/format';
 
 export default function PaginaVendas() {
   const { erro } = useAvisos();
@@ -160,16 +160,20 @@ function DetalheVenda({ id, aoMudar }: { id: number; aoMudar: () => void }) {
   const [venda, setVenda] = useState<Venda | null>(null);
   const [danfe, setDanfe] = useState<DanfeDados | null>(null);
   const [estornando, setEstornando] = useState(false);
+  const [trocando, setTrocando] = useState(false);
+  const [devolucoes, setDevolucoes] = useState<Devolucao[]>([]);
   const [motivo, setMotivo] = useState('');
 
   const carregar = useCallback(() => {
     api.venda(id).then(setVenda).catch(erro);
+    api.devolucoes(id).then(setDevolucoes).catch(() => undefined);
   }, [id, erro]);
   useEffect(carregar, [carregar]);
 
   if (!venda) return null;
   const nota = venda.notaFiscal;
-  const podeEstornar = venda.status === 'FINALIZADA' && caixa?.id === venda.caixaId;
+  const podeEstornar = venda.status === 'FINALIZADA' && caixa?.id === venda.caixaId && devolucoes.length === 0;
+  const podeTrocar = venda.status === 'FINALIZADA' && venda.itens.some((i) => i.quantidadeDevolvida < i.quantidade);
   const podeEmitir = venda.status === 'FINALIZADA' && (!nota || nota.status === 'REJEITADA' || nota.status === 'PENDENTE');
 
   const emitir = async () => {
@@ -282,6 +286,36 @@ function DetalheVenda({ id, aoMudar }: { id: number; aoMudar: () => void }) {
         )}
       </section>
 
+      {devolucoes.length > 0 && (
+        <section className="detalhe__nota">
+          <h3>Trocas e devoluções</h3>
+          {devolucoes.map((d) => (
+            <p key={d.devolucaoId} className="dica">
+              {dataHora(d.dataHora)} · {moeda(d.valor)} {d.destino === 'VALE_TROCA' ? `em vale-troca ${d.codigoVale}` : 'devolvidos em dinheiro'}
+            </p>
+          ))}
+        </section>
+      )}
+
+      {podeTrocar && !trocando && (
+        <button className="botao botao--secundario" onClick={() => setTrocando(true)}>
+          Trocar / devolver itens
+        </button>
+      )}
+      {trocando && (
+        <Troca
+          venda={venda}
+          aoConcluir={(d) => {
+            setTrocando(false);
+            carregar();
+            aoMudar();
+            recarregar();
+            avisar(d.destino === 'VALE_TROCA' ? `Vale-troca ${d.codigoVale} de ${moeda(d.valor)} gerado.` : `${moeda(d.valor)} devolvidos em dinheiro.`);
+          }}
+          aoVoltar={() => setTrocando(false)}
+        />
+      )}
+
       {podeEstornar &&
         (estornando ? (
           <form className="confirmacao" onSubmit={estornar}>
@@ -311,4 +345,112 @@ function DetalheVenda({ id, aoMudar }: { id: number; aoMudar: () => void }) {
 function dinheiroLiquido(v: Venda) {
   const dinheiro = v.pagamentos.filter((p) => p.forma === 'DINHEIRO').reduce((s, p) => s + p.valor, 0);
   return Math.max(0, dinheiro - v.troco);
+}
+
+/** Escolhe os itens que voltam e o destino do valor (vale-troca ou dinheiro). */
+function Troca({ venda, aoConcluir, aoVoltar }: { venda: Venda; aoConcluir: (d: Devolucao) => void; aoVoltar: () => void }) {
+  const { erro } = useAvisos();
+  const [qtds, setQtds] = useState<Record<number, string>>({});
+  const [destino, setDestino] = useState<'VALE_TROCA' | 'DINHEIRO'>('VALE_TROCA');
+  const [motivo, setMotivo] = useState('');
+  const [vale, setVale] = useState<Devolucao | null>(null);
+  const fator = venda.subtotal > 0 ? venda.total / venda.subtotal : 1;
+  const estimativa = venda.itens.reduce((s, i) => {
+    const q = parseValor(qtds[i.id] ?? '');
+    return s + (Number.isFinite(q) ? (i.subtotal * fator * q) / i.quantidade : 0);
+  }, 0);
+
+  if (vale) {
+    return (
+      <div className="detalhe__nota">
+        <div className="impressao">
+          <div className="comprovante-vale">
+            <strong>VALE-TROCA</strong>
+            <span className="comprovante-vale__codigo">{vale.codigoVale}</span>
+            <span>{moeda(vale.valor)}</span>
+            <small>Venda de origem #{venda.id} · {dataHora(vale.dataHora)}</small>
+            <small>Apresente este código no caixa para usar o crédito.</small>
+          </div>
+        </div>
+        <div className="acoes__linha">
+          <button className="botao botao--principal" onClick={() => window.print()}>
+            Imprimir vale
+          </button>
+          <button className="botao botao--fantasma" onClick={() => aoConcluir(vale)}>
+            Concluir
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <form
+      className="troca"
+      onSubmit={async (e) => {
+        e.preventDefault();
+        const itens = Object.entries(qtds)
+          .map(([itemId, q]) => ({ itemId: Number(itemId), quantidade: parseValor(q) }))
+          .filter((i) => Number.isFinite(i.quantidade) && i.quantidade > 0);
+        try {
+          const d = await api.devolver(venda.id, itens, destino, motivo || undefined);
+          if (d.destino === 'VALE_TROCA') setVale(d);
+          else aoConcluir(d);
+        } catch (err) {
+          erro(err);
+        }
+      }}
+    >
+      <h3>O que está voltando?</h3>
+      <table className="tabela tabela--compacta">
+        <tbody>
+          {venda.itens.map((i) => {
+            const livre = i.quantidade - i.quantidadeDevolvida;
+            return (
+              <tr key={i.id} className={livre <= 0 ? 'tabela__inativa' : ''}>
+                <td>
+                  {i.descricao}
+                  <small className="bloco-texto">
+                    comprou {qtd(i.quantidade)}
+                    {i.quantidadeDevolvida > 0 && ` · já voltou ${qtd(i.quantidadeDevolvida)}`}
+                  </small>
+                </td>
+                <td className="tabela__num">
+                  <input
+                    className="tabela__input tabela__input--num"
+                    inputMode="decimal"
+                    placeholder="0"
+                    disabled={livre <= 0}
+                    value={qtds[i.id] ?? ''}
+                    onChange={(e) => setQtds({ ...qtds, [i.id]: e.target.value })}
+                    aria-label={`Quantidade de ${i.descricao} devolvida`}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      <div className="segmentado" role="radiogroup">
+        <button type="button" role="radio" aria-checked={destino === 'VALE_TROCA'} onClick={() => setDestino('VALE_TROCA')}>
+          Vale-troca
+        </button>
+        <button type="button" role="radio" aria-checked={destino === 'DINHEIRO'} onClick={() => setDestino('DINHEIRO')}>
+          Dinheiro de volta
+        </button>
+      </div>
+      <input placeholder="Motivo (ex.: tamanho errado)" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
+      <p className="dica">
+        Valor estimado: <strong>{moeda(estimativa)}</strong> (com o desconto da venda). Os itens voltam para o estoque. Pede o PIN do gerente.
+      </p>
+      <div className="acoes__linha">
+        <button className="botao botao--principal" disabled={estimativa <= 0}>
+          Confirmar {destino === 'VALE_TROCA' ? 'troca' : 'devolução'}
+        </button>
+        <button type="button" className="botao botao--fantasma" onClick={aoVoltar}>
+          Voltar
+        </button>
+      </div>
+    </form>
+  );
 }

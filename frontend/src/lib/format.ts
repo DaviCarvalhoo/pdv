@@ -51,6 +51,7 @@ export const nomeForma: Record<FormaPagamento, string> = {
   VALE_ALIMENTACAO: 'Vale-alimentação',
   VALE_REFEICAO: 'Vale-refeição',
   CREDIARIO: 'Fiado',
+  VALE_TROCA: 'Vale-troca',
 };
 
 export const nomeStatusVenda: Record<StatusVenda, string> = {

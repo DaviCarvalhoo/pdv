@@ -449,7 +449,7 @@ A lista original cobre o ciclo básico da venda. Comparando com os PDVs mais usa
 | M11 | **Categorias** de produto | Organizar cadastro e relatórios | ✅ Fase 9 |
 | M12 | **Curva ABC** de produtos | Saber o que não pode faltar na prateleira | ✅ Fase 10 |
 | M13 | **Alerta de sangria** (limite de dinheiro na gaveta) | Segurança: menos dinheiro exposto | ✅ Fase 9 |
-| M15 | Troca e devolução com vale-troca | Comum em loja de roupa e presentes | Backlog (P1) |
+| M15 | Troca e devolução com vale-troca | Comum em loja de roupa e presentes | ✅ |
 | M16 | Orçamento / pré-venda (vendedor monta, caixa recebe) | Lojas com balcão e caixa separados | Backlog (P1) |
 | M17 | PIX com QR Code dinâmico (integração com banco/PSP) e baixa automática | Elimina conferência manual do PIX | Backlog (P1) |
 | M18 | TEF (maquininha integrada) | Elimina digitação do valor na maquininha | Backlog (P2) |

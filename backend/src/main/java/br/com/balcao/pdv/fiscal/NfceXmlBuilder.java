@@ -142,6 +142,9 @@ public final class NfceXmlBuilder {
         for (Pagamento p : v.getPagamentos()) {
             abrir("detPag");
             tag("tPag", p.getForma().codigoNfce());
+            if ("99".equals(p.getForma().codigoNfce())) {
+                tag("xPag", "Vale-troca");
+            }
             tag("vPag", valor(p.getValor()));
             if (p.getForma().isCartao() || p.getForma() == FormaPagamento.PIX) {
                 // 2 = pagamento não integrado ao sistema de automação (maquininha/PIX lançados à mão).
