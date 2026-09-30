@@ -62,6 +62,7 @@ export interface Loja extends LojaPublica {
   pixCidade?: string;
   pixConfigurado: boolean;
   aliquotaTributos?: number;
+  bloqueioInatividadeMin: number;
 }
 
 export interface Categoria {
@@ -131,8 +132,23 @@ export interface MovimentacaoEstoque {
   dataHora: string;
 }
 
+export interface Terminal {
+  id: number;
+  nome: string;
+  ativo: boolean;
+  ultimoUso?: string;
+  caixaId?: number;
+  abertoEm?: string;
+  gaveta?: number;
+}
+
+/** O que este computador é: um caixa (terminal) ou só retaguarda (gerência, sem vender). */
+export type EsteComputador = { id: number; nome: string } | { retaguarda: true };
+
 export interface Caixa {
   id: number;
+  terminalId: number;
+  terminalNome: string;
   status: 'ABERTO' | 'FECHADO';
   saldoInicial: number;
   saldoEsperado?: number;
@@ -338,6 +354,7 @@ export interface Painel {
   porForma: Serie[];
   porCategoria: Serie[];
   porOperador: Serie[];
+  porCaixa: Serie[];
   ultimos30Dias: Serie[];
   maisVendidos: { produtoId: number; nome: string; quantidade: number; valor: number; lucro?: number }[];
   alertas: {
@@ -348,6 +365,8 @@ export interface Painel {
     gaveta?: number;
     limiteGaveta?: number;
     vendasEmEspera: number;
+    caixasAbertos: number;
+    caixasAcimaDoLimite: number;
   };
 }
 
@@ -484,6 +503,38 @@ export function sessaoSalva(): Sessao | null {
 }
 
 let tokenAtual: string | null = sessaoSalva()?.token ?? null;
+
+const CHAVE_TERMINAL = 'balcao.terminal';
+
+export function terminalSalvo(): EsteComputador | null {
+  try {
+    const t = localStorage.getItem(CHAVE_TERMINAL);
+    return t ? (JSON.parse(t) as EsteComputador) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function guardarTerminal(t: EsteComputador | null) {
+  try {
+    if (t) localStorage.setItem(CHAVE_TERMINAL, JSON.stringify(t));
+    else localStorage.removeItem(CHAVE_TERMINAL);
+  } catch {
+    /* sem armazenamento: vale só nesta aba */
+  }
+  terminalAtual = t && 'id' in t ? t.id : null;
+}
+
+let terminalAtual: number | null = (() => {
+  const t = terminalSalvo();
+  return t && 'id' in t ? t.id : null;
+})();
+
+/** Avisos de conexão: a tela mostra "sem conexão" e tenta reconectar sozinha. */
+let aoMudarConexao: (online: boolean) => void = () => undefined;
+export function aoConexao(fn: (online: boolean) => void) {
+  aoMudarConexao = fn;
+}
 let aoExpirar: () => void = () => undefined;
 let pedirAutorizacao: ((motivo: string) => Promise<string | null>) | null = null;
 
@@ -511,12 +562,15 @@ async function request<T>(method: string, url: string, body?: unknown, autorizac
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   if (tokenAtual) headers.Authorization = 'Bearer ' + tokenAtual;
   if (autorizacao) headers['X-Autorizacao'] = autorizacao;
+  if (terminalAtual) headers['X-Terminal'] = String(terminalAtual);
   let resp: Response;
   try {
     resp = await fetch('/api' + url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   } catch {
-    throw new ApiError(0, 'SEM_CONEXAO', 'Sem conexão com o servidor. Verifique se o backend está no ar.');
+    aoMudarConexao(false);
+    throw new ApiError(0, 'SEM_CONEXAO', 'Sem conexão com o servidor. A operação não foi concluída; tente de novo quando a conexão voltar.');
   }
+  aoMudarConexao(true);
   if (resp.status === 204) return undefined as T;
   const texto = await resp.text();
   const dados = texto ? JSON.parse(texto) : undefined;
@@ -555,6 +609,7 @@ export const api = {
   entrar: (usuarioId: number, pin: string) => request<Sessao>('POST', '/auth/entrar', { usuarioId, pin }),
   sair: () => request<void>('POST', '/auth/sair'),
   autorizar: (pin: string) => request<{ autorizacao: string }>('POST', '/auth/autorizar', { pin }),
+  desbloquear: (pin: string) => request<void>('POST', '/usuarios/eu/desbloquear', { pin }),
   usuarios: () => request<Usuario[]>('GET', '/usuarios'),
   criarUsuario: (u: { nome: string; papel: Papel; pin: string }) => request<Usuario>('POST', '/usuarios', u),
   atualizarUsuario: (id: number, u: { nome: string; papel: Papel; ativo: boolean }) =>
@@ -608,6 +663,11 @@ export const api = {
 
   // Caixa
   caixaAberto: () => request<Caixa | undefined>('GET', '/caixas/aberto'),
+  caixasAbertos: () => request<Caixa[]>('GET', '/caixas/abertos'),
+  terminais: () => request<Terminal[]>('GET', '/terminais'),
+  criarTerminal: (nome: string) => request<Terminal>('POST', '/terminais', { nome }),
+  atualizarTerminal: (id: number, nome: string, ativo: boolean) => request<Terminal>('PUT', `/terminais/${id}`, { nome, ativo }),
+  excluirTerminal: (id: number) => request<Exclusao>('DELETE', `/terminais/${id}`),
   abrirCaixa: (saldoInicial: number) => request<Caixa>('POST', '/caixas', { saldoInicial }),
   suprimento: (id: number, valor: number, descricao?: string) =>
     request<MovimentacaoCaixa>('POST', `/caixas/${id}/suprimentos`, { valor, descricao }),

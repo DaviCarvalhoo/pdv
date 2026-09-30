@@ -30,7 +30,8 @@ public class LojaService {
                               String mensagemCupom, PoliticaSaldoInsuficiente politicaEstoque,
                               BigDecimal limiteGaveta, BigDecimal descontoMaxOperador, String balancaPrefixo,
                               Integer balancaDigitosCodigo, TipoValorBalanca balancaTipoValor, String chavePix,
-                              String pixRecebedor, String pixCidade, BigDecimal aliquotaTributos) {
+                              String pixRecebedor, String pixCidade, BigDecimal aliquotaTributos,
+                              Integer bloqueioInatividadeMin) {
     }
 
     @Transactional(readOnly = true)
@@ -94,6 +95,12 @@ public class LojaService {
         l.setPixRecebedor(texto(r.pixRecebedor()));
         l.setPixCidade(texto(r.pixCidade()));
         l.setAliquotaTributos(r.aliquotaTributos());
+        if (r.bloqueioInatividadeMin() != null) {
+            if (r.bloqueioInatividadeMin() < 0 || r.bloqueioInatividadeMin() > 240) {
+                throw new RegraNegocioException("BLOQUEIO_INVALIDO", "O bloqueio deve ficar entre 0 (desligado) e 240 minutos.");
+            }
+            l.setBloqueioInatividadeMin(r.bloqueioInatividadeMin());
+        }
         return l;
     }
 

@@ -6,37 +6,38 @@
  * Autoria: BPDV-7F3A-DC26
  */
 
-package br.com.balcao.pdv.usuario;
+package br.com.balcao.pdv.caixa;
 
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 import java.time.OffsetDateTime;
 
+/** Um ponto de venda físico (computador, notebook ou tablet): "Caixa 01", "Caixa 02"... Cada um tem a sua gaveta. */
 @Entity
-@Table(name = "sessao")
+@Table(name = "terminal")
 @Getter
+@Setter
 @NoArgsConstructor
-public class Sessao {
+public class Terminal {
 
     @Id
-    private String token;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    @ManyToOne(fetch = FetchType.EAGER, optional = false)
-    private Usuario usuario;
+    private String nome;
+    private boolean ativo = true;
+    private OffsetDateTime criadoEm;
+    private OffsetDateTime ultimoUso;
 
-    private OffsetDateTime criadaEm;
-    private OffsetDateTime expiraEm;
-
-    void renovar(OffsetDateTime novaExpiracao) {
-        this.expiraEm = novaExpiracao;
+    public Terminal(String nome) {
+        this.nome = nome;
     }
 
-    public Sessao(String token, Usuario usuario, OffsetDateTime agora, OffsetDateTime expiraEm) {
-        this.token = token;
-        this.usuario = usuario;
-        this.criadaEm = agora;
-        this.expiraEm = expiraEm;
+    @PrePersist
+    void aoCriar() {
+        criadoEm = OffsetDateTime.now();
     }
 }

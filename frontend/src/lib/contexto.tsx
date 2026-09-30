@@ -10,10 +10,14 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import {
   api,
   ApiError,
+  aoConexao,
   aoSessaoExpirar,
   guardarSessao,
+  guardarTerminal,
   sessaoSalva,
+  terminalSalvo,
   type Caixa,
+  type EsteComputador,
   type LojaPublica,
   type Operador,
   type Papel,
@@ -81,6 +85,12 @@ interface SessaoCtx {
   sair: () => void;
   loja: LojaPublica | null;
   recarregarLoja: () => Promise<void>;
+  /** Por que a sessão terminou sem o operador clicar em sair (para explicar na tela de login). */
+  motivoSaida: string | null;
+  /** Qual caixa é este computador (ou retaguarda). Nulo = ainda não configurado. */
+  terminal: EsteComputador | null;
+  definirTerminal: (t: EsteComputador | null) => void;
+  online: boolean;
 }
 
 const SessaoContext = createContext<SessaoCtx>(null!);
@@ -99,6 +109,9 @@ function aplicarCor(cor?: string) {
 export function SessaoProvider({ children }: { children: ReactNode }) {
   const [sessao, setSessao] = useState<Sessao | null>(sessaoSalva());
   const [loja, setLoja] = useState<LojaPublica | null>(null);
+  const [motivoSaida, setMotivoSaida] = useState<string | null>(null);
+  const [terminal, setTerminal] = useState<EsteComputador | null>(terminalSalvo());
+  const [online, setOnline] = useState(true);
 
   const recarregarLoja = useCallback(async () => {
     try {
@@ -115,11 +128,30 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     recarregarLoja();
-    aoSessaoExpirar(() => setSessao(null));
+    aoSessaoExpirar(() => {
+      setMotivoSaida('Sua sessão terminou (muito tempo sem uso ou acesso encerrado pelo administrador). Entre de novo: a venda em andamento continua salva.');
+      setSessao(null);
+    });
+    aoConexao(setOnline);
   }, [recarregarLoja]);
+
+  // Sem conexão: tenta o servidor a cada 3 s até voltar.
+  useEffect(() => {
+    if (online) return;
+    const t = setInterval(() => {
+      api.lojaPublica().catch(() => undefined);
+    }, 3000);
+    return () => clearInterval(t);
+  }, [online]);
+
+  const definirTerminal = useCallback((t: EsteComputador | null) => {
+    guardarTerminal(t);
+    setTerminal(t);
+  }, []);
 
   const entrar = useCallback((s: Sessao) => {
     guardarSessao(s);
+    setMotivoSaida(null);
     setSessao(s);
   }, []);
 
@@ -133,7 +165,9 @@ export function SessaoProvider({ children }: { children: ReactNode }) {
   const pode = useCallback((minimo: Papel) => podePapel(operador?.papel, minimo), [operador]);
 
   return (
-    <SessaoContext.Provider value={{ sessao, operador, pode, entrar, sair, loja, recarregarLoja }}>
+    <SessaoContext.Provider
+      value={{ sessao, operador, pode, entrar, sair, loja, recarregarLoja, motivoSaida, terminal, definirTerminal, online }}
+    >
       {children}
     </SessaoContext.Provider>
   );
@@ -154,8 +188,15 @@ const CaixaContext = createContext<CaixaCtx>(null!);
 export function CaixaProvider({ children }: { children: ReactNode }) {
   const [caixa, setCaixa] = useState<Caixa | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const { terminal } = useSessao();
+  const retaguarda = !!terminal && 'retaguarda' in terminal;
 
   const recarregar = useCallback(async () => {
+    if (retaguarda) {
+      setCaixa(null);
+      setCarregando(false);
+      return;
+    }
     try {
       setCaixa((await api.caixaAberto()) ?? null);
     } catch {
@@ -163,7 +204,7 @@ export function CaixaProvider({ children }: { children: ReactNode }) {
     } finally {
       setCarregando(false);
     }
-  }, []);
+  }, [retaguarda]);
 
   useEffect(() => {
     recarregar();

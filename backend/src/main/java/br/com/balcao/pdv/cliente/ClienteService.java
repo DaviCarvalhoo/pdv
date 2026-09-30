@@ -121,6 +121,12 @@ public class ClienteService {
     @Transactional
     public LancamentoCliente receber(Long clienteId, BigDecimal valor, FormaPagamento forma, String observacao,
                                      Long operadorId) {
+        return receber(clienteId, valor, forma, observacao, operadorId, null);
+    }
+
+    @Transactional
+    public LancamentoCliente receber(Long clienteId, BigDecimal valor, FormaPagamento forma, String observacao,
+                                     Long operadorId, Long terminalId) {
         if (!Dinheiro.positivo(valor)) {
             throw new RegraNegocioException("VALOR_INVALIDO", "Informe o valor recebido.");
         }
@@ -134,7 +140,7 @@ public class ClienteService {
                     "O cliente deve " + c.getSaldoDevedor() + ".", Map.of("saldoDevedor", c.getSaldoDevedor()));
         }
         if (forma == FormaPagamento.DINHEIRO) {
-            Caixa caixa = caixaService.exigirAberto();
+            Caixa caixa = caixaService.exigirAberto(terminalId);
             caixaService.registrarRecebimentoCliente(caixaService.travar(caixa.getId()), v, c.getNome(), operadorId);
         }
         return registrar(c, LancamentoCliente.Tipo.PAGAMENTO, v, forma.name(), null, operadorId,

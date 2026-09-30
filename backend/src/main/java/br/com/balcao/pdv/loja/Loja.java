@@ -58,6 +58,9 @@ public class Loja {
     /** Alíquota aproximada padrão (Lei 12.741) quando o produto não tem a sua. */
     private BigDecimal aliquotaTributos;
 
+    /** Minutos sem uso até a tela travar pedindo o PIN (0 desliga). */
+    private Integer bloqueioInatividadeMin;
+
     private OffsetDateTime atualizadoEm;
 
     @PreUpdate

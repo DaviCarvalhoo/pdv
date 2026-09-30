@@ -111,15 +111,39 @@ public class AuthService {
         }
     }
 
-    @Transactional(readOnly = true)
+    /**
+     * Operador dono do token. A sessão desliza: enquanto houver uso, a validade é renovada, então quem está
+     * trabalhando nunca é derrubado no meio do turno. Só expira depois de 12 h sem nenhuma requisição.
+     */
+    @Transactional
     public Optional<Operador> operadorDoToken(String token) {
         if (!StringUtils.hasText(token)) {
             return Optional.empty();
         }
-        return sessoes.findByTokenAndExpiraEmAfter(token, agora())
-                .map(Sessao::getUsuario)
-                .filter(Usuario::isAtivo)
-                .map(Operador::de);
+        OffsetDateTime agora = agora();
+        return sessoes.findByTokenAndExpiraEmAfter(token, agora)
+                .filter(s -> s.getUsuario().isAtivo())
+                .map(s -> {
+                    // Renova no máximo a cada 10 min para não gravar no banco a cada clique.
+                    if (s.getExpiraEm().isBefore(agora.plus(DURACAO_SESSAO).minusMinutes(10))) {
+                        s.renovar(agora.plus(DURACAO_SESSAO));
+                    }
+                    return Operador.de(s.getUsuario());
+                });
+    }
+
+    /** Desbloqueio da tela: confere o PIN do próprio operador, com o mesmo limite de tentativas do login. */
+    @Transactional
+    public void desbloquear(Long usuarioId, String pin) {
+        Usuario u = buscar(usuarioId);
+        if (tentativas.getOrDefault(u.getId(), 0) >= MAX_TENTATIVAS) {
+            throw new NaoAutenticadoException("PIN bloqueado após " + MAX_TENTATIVAS + " tentativas. Entre de novo.");
+        }
+        if (!confere(pin, u.getPinHash())) {
+            tentativas.merge(u.getId(), 1, Integer::sum);
+            throw new RegraNegocioException("PIN_INCORRETO", "PIN incorreto.");
+        }
+        tentativas.remove(u.getId());
     }
 
     /** Gera uma autorização de uso único se o PIN for de um gerente ou administrador ativo. */

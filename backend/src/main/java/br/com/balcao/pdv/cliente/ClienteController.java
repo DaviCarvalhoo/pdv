@@ -105,7 +105,7 @@ public class ClienteController {
     @ResponseStatus(HttpStatus.CREATED)
     public LancamentoResponse receber(@PathVariable Long id, @Valid @RequestBody RecebimentoRequest req) {
         return LancamentoResponse.de(service.receber(id, req.valor(), req.forma(), req.observacao(),
-                contexto.operadorId()));
+                contexto.operadorId(), contexto.terminalId()));
     }
 
     @Requer(Papel.GERENTE)

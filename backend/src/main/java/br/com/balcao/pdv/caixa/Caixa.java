@@ -29,6 +29,10 @@ public class Caixa {
     @Enumerated(EnumType.STRING)
     private StatusCaixa status;
 
+    /** O ponto de venda físico (computador/tablet) desta gaveta. */
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
+    private Terminal terminal;
+
     private BigDecimal saldoInicial;
     private OffsetDateTime dataAbertura;
     private OffsetDateTime dataFechamento;
@@ -47,11 +51,8 @@ public class Caixa {
     @Version
     private Long version;
 
-    public Caixa(BigDecimal saldoInicial, OffsetDateTime agora) {
-        this(saldoInicial, agora, null);
-    }
-
-    public Caixa(BigDecimal saldoInicial, OffsetDateTime agora, Long operadorId) {
+    public Caixa(Terminal terminal, BigDecimal saldoInicial, OffsetDateTime agora, Long operadorId) {
+        this.terminal = terminal;
         this.operadorAberturaId = operadorId;
         this.status = StatusCaixa.ABERTO;
         this.saldoInicial = saldoInicial;
@@ -64,7 +65,8 @@ public class Caixa {
 
     public void exigirAberto() {
         if (!isAberto()) {
-            throw new ConflitoException("CAIXA_FECHADO", "O caixa #" + id + " está fechado.");
+            throw new ConflitoException("CAIXA_FECHADO",
+                    "O caixa #" + id + (terminal != null ? " (" + terminal.getNome() + ")" : "") + " está fechado.");
         }
     }
 

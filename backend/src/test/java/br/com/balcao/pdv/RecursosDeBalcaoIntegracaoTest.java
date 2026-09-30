@@ -69,7 +69,7 @@ class RecursosDeBalcaoIntegracaoTest extends IntegracaoBase {
         jdbc.update("UPDATE configuracao_fiscal SET proximo_numero = 1");
         lojaService.atualizar(new LojaService.LojaRequest("Loja Teste", null, null, "#D9482B", null,
                 PoliticaSaldoInsuficiente.PERMITIR_E_AVISAR, null, new BigDecimal("5"), "2", 4,
-                TipoValorBalanca.PRECO, "pix@loja.com.br", "Loja Teste", "Sao Paulo", new BigDecimal("30")));
+                TipoValorBalanca.PRECO, "pix@loja.com.br", "Loja Teste", "Sao Paulo", new BigDecimal("30"), null));
         configuracaoFiscalService.atualizar(new ConfiguracaoFiscalDto.Request(
                 "11222333000181", "111111111111", "EMPRESA TESTE LTDA", "Teste", 1, "Rua A", "1", "Centro",
                 "3550308", "São Paulo", "SP", "01001000", null, Ambiente.HOMOLOGACAO, 1, null, "1", "CSC-TESTE",

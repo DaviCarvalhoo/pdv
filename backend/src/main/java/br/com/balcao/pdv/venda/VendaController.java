@@ -77,18 +77,18 @@ public class VendaController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public VendaResponse iniciar() {
-        return service.iniciar(contexto.operadorId());
+        return service.iniciar(contexto.operadorId(), contexto.terminalId());
     }
 
     /** 200 com a venda em andamento no caixa atual ou 204 se não houver. */
     @GetMapping("/aberta")
     public ResponseEntity<VendaResponse> emAndamento() {
-        return service.emAndamento().map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
+        return service.emAndamento(contexto.terminalId()).map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping("/em-espera")
     public List<VendaResumo> emEspera() {
-        return service.emEspera();
+        return service.emEspera(contexto.terminalId());
     }
 
     @GetMapping
@@ -212,7 +212,8 @@ public class VendaController {
     @ResponseStatus(HttpStatus.CREATED)
     public TrocaService.Resultado devolver(@PathVariable Long id, @Valid @RequestBody DevolucaoRequest req) {
         contexto.exigirGerente("Troca/devolução");
-        return trocaService.devolver(id, req.itens(), req.destino(), req.motivo(), contexto.operadorId());
+        return trocaService.devolver(id, req.itens(), req.destino(), req.motivo(), contexto.operadorId(),
+                contexto.terminalId());
     }
 
     @GetMapping("/{id}/devolucoes")

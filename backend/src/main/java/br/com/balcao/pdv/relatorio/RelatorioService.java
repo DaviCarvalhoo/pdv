@@ -55,11 +55,13 @@ public class RelatorioService {
     }
 
     public record Alertas(long estoqueBaixo, long estoqueZerado, long notasComProblema, BigDecimal fiadoAReceber,
-                          BigDecimal gaveta, BigDecimal limiteGaveta, long vendasEmEspera) {
+                          BigDecimal gaveta, BigDecimal limiteGaveta, long vendasEmEspera, long caixasAbertos,
+                          long caixasAcimaDoLimite) {
     }
 
     public record Painel(LocalDate dia, Resumo hoje, Resumo ontem, List<Serie> porHora, List<Serie> porForma,
-                         List<Serie> porCategoria, List<Serie> porOperador, List<Serie> ultimos30Dias,
+                         List<Serie> porCategoria, List<Serie> porOperador, List<Serie> porCaixa,
+                         List<Serie> ultimos30Dias,
                          List<ProdutoRanking> maisVendidos, Alertas alertas) {
     }
 
@@ -89,6 +91,11 @@ public class RelatorioService {
                 series(hoje, """
                         select coalesce(u.nome, 'Sem operador') rotulo, sum(v.total) valor, count(*) qtd
                         from venda v left join usuario u on u.id = v.operador_id
+                        where %s group by 1 order by 2 desc
+                        """),
+                series(hoje, """
+                        select t.nome rotulo, sum(v.total) valor, count(*) qtd
+                        from venda v join caixa c on c.id = v.caixa_id join terminal t on t.id = c.terminal_id
                         where %s group by 1 order by 2 desc
                         """),
                 ultimosDias(dia, 30),
@@ -237,13 +244,23 @@ public class RelatorioService {
         long notas = jdbc.queryForObject("""
                 select count(*) from nota_fiscal where status in ('REJEITADA', 'PENDENTE')
                 """, p, Long.class);
-        var caixa = caixaService.aberto();
-        BigDecimal gaveta = caixa.map(caixaService::saldoEsperado).orElse(null);
-        long espera = caixa.map(c -> jdbc.queryForObject(
-                "select count(*) from venda where caixa_id = :c and status = 'ABERTA' and em_espera",
-                new MapSqlParameterSource("c", c.getId()), Long.class)).orElse(0L);
+        var abertos = caixaService.abertos();
+        BigDecimal limite = lojaService.obter().getLimiteGaveta();
+        BigDecimal gaveta = null;
+        long acima = 0;
+        for (var c : abertos) {
+            BigDecimal saldo = caixaService.saldoEsperado(c);
+            gaveta = gaveta == null ? saldo : gaveta.add(saldo);
+            if (limite != null && saldo.compareTo(limite) > 0) {
+                acima++;
+            }
+        }
+        long espera = jdbc.queryForObject(
+                "select count(*) from venda v join caixa c on c.id = v.caixa_id "
+                        + "where c.status = 'ABERTO' and v.status = 'ABERTA' and v.em_espera",
+                new MapSqlParameterSource(), Long.class);
         return new Alertas(((Number) e.get("baixo")).longValue(), ((Number) e.get("zerado")).longValue(), notas,
-                clienteService.totalAReceber(), gaveta, lojaService.obter().getLimiteGaveta(), espera);
+                clienteService.totalAReceber(), gaveta, limite, espera, abertos.size(), acima);
     }
 
     private static MapSqlParameterSource periodo(LocalDate inicio, LocalDate fimExclusivo) {

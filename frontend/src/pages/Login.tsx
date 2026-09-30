@@ -14,7 +14,7 @@ import { useSessao } from '../lib/contexto';
 import { iniciais, nomePapel } from '../lib/format';
 
 export default function Login() {
-  const { entrar: guardar, loja } = useSessao();
+  const { entrar: guardar, loja, motivoSaida } = useSessao();
   const navegar = useNavigate();
   // Depois de entrar, começa pela tela inicial do perfil (e não pela última tela do operador anterior).
   const entrar: typeof guardar = (s) => {
@@ -43,6 +43,7 @@ export default function Login() {
       </aside>
       <main className="login__painel">
         {falha && <p className="faixa faixa--alerta">{falha}</p>}
+        {motivoSaida && !falha && <p className="faixa faixa--alerta login__aviso">{motivoSaida}</p>}
         {estado?.precisaPrimeiroAcesso && <PrimeiroAcesso aoEntrar={entrar} />}
         {estado && !estado.precisaPrimeiroAcesso && <Operadores operadores={estado.operadores} aoEntrar={entrar} />}
       </main>

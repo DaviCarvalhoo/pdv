@@ -22,3 +22,6 @@ Thumbs.db
 
 # Logs locais
 logs/
+
+# Backups do banco (dados da loja: nunca subir)
+backups/

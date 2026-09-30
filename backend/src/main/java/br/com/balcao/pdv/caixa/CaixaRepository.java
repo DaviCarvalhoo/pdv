@@ -17,11 +17,14 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 
 public interface CaixaRepository extends JpaRepository<Caixa, Long> {
 
-    Optional<Caixa> findFirstByStatus(StatusCaixa status);
+    Optional<Caixa> findFirstByStatusAndTerminalId(StatusCaixa status, Long terminalId);
+
+    List<Caixa> findByStatusOrderByTerminalNome(StatusCaixa status);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select c from Caixa c where c.id = :id")

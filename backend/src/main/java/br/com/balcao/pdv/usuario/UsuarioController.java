@@ -49,6 +49,13 @@ public class UsuarioController {
         return contexto.operador();
     }
 
+    /** Desbloqueia a tela travada por inatividade (PIN do próprio operador). */
+    @PostMapping("/eu/desbloquear")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void desbloquear(@Valid @RequestBody PinRequest req) {
+        service.desbloquear(contexto.operadorId(), req.pin());
+    }
+
     @GetMapping
     @Requer(Papel.ADMIN)
     public List<UsuarioResponse> listar() {

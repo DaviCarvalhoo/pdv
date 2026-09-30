@@ -27,6 +27,7 @@ public class Contexto {
 
     static final String ATRIBUTO = "balcao.operador";
     public static final String CABECALHO_AUTORIZACAO = "X-Autorizacao";
+    public static final String CABECALHO_TERMINAL = "X-Terminal";
 
     private final AuthService authService;
 
@@ -40,6 +41,19 @@ public class Contexto {
 
     public Long operadorId() {
         return operador().id();
+    }
+
+    /** Terminal (caixa físico) que fez a requisição, ou nulo para usar o terminal padrão. */
+    public Long terminalId() {
+        String t = request().getHeader(CABECALHO_TERMINAL);
+        if (t == null || t.isBlank()) {
+            return null;
+        }
+        try {
+            return Long.valueOf(t.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /**

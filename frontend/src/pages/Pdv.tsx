@@ -25,7 +25,7 @@ export interface LeitorHandle {
 
 export default function PaginaPdv() {
   const { caixa, carregando, recarregar } = useCaixa();
-  const { operador } = useSessao();
+  const { operador, terminal } = useSessao();
   const { avisar, erro } = useAvisos();
 
   const [venda, setVenda] = useState<Venda | null>(null);
@@ -136,9 +136,15 @@ export default function PaginaPdv() {
   };
 
   const finalizar = async () => {
-    if (!venda || venda.restante > 0) return;
-    const v = await executar(() => api.finalizar(venda.id));
-    if (!v) return;
+    if (!venda || venda.restante > 0 || ocupado) return;
+    let v = await executar(() => api.finalizar(venda.id));
+    if (!v) {
+      // A resposta pode ter se perdido com a venda já gravada: confere antes de pedir para repetir.
+      const atual = await api.venda(venda.id).catch(() => null);
+      if (atual?.status !== 'FINALIZADA') return;
+      setVenda(atual);
+      v = atual;
+    }
     setModo('concluida');
     v.avisos.forEach((a) => avisar(a, 'info'));
     recarregar();
@@ -198,7 +204,8 @@ export default function PaginaPdv() {
   useAtalhos({ Enter: novaVenda, p: () => danfe && window.print(), P: () => danfe && window.print() }, modo === 'concluida');
 
   if (carregando) return <div className="pdv" />;
-  if (!caixa) return <CaixaFechado />;
+  if (terminal && 'retaguarda' in terminal) return <CaixaFechado retaguarda />;
+  if (!caixa) return <CaixaFechado nome={terminal && 'nome' in terminal ? terminal.nome : 'O caixa'} />;
 
   const itens = vendaAberta || modo !== 'itens' ? (venda?.itens ?? []) : [];
   const mostrarAtalhos = modo === 'itens' && atalhos.length > 0;
@@ -485,11 +492,25 @@ export default function PaginaPdv() {
 
 // ---------------------------------------------------------------------------------------------
 
-function CaixaFechado() {
+function CaixaFechado({ nome, retaguarda }: { nome?: string; retaguarda?: boolean }) {
+  if (retaguarda) {
+    return (
+      <div className="pdv pdv--fechado">
+        <div className="fechado">
+          <p className="sobretitulo">Retaguarda</p>
+          <h1>Este computador não vende.</h1>
+          <p>Ele está configurado como retaguarda (gerência). Para vender aqui, escolha um caixa na tela Caixa.</p>
+          <Link className="botao botao--principal botao--grande" to="/caixa">
+            Ir para Caixa
+          </Link>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="pdv pdv--fechado">
       <div className="fechado">
-        <p className="sobretitulo">Caixa fechado</p>
+        <p className="sobretitulo">{nome} · fechado</p>
         <h1>Abra o caixa para começar a vender.</h1>
         <p>Informe o dinheiro que está na gaveta (fundo de troco) e o PDV fica pronto para o leitor.</p>
         <Link className="botao botao--principal botao--grande" to="/caixa">

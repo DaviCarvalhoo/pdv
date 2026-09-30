@@ -7,6 +7,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: balcao-postgres
+    # Volta sozinho depois de reiniciar o computador ou o Docker.
+    restart: unless-stopped
     environment:
       POSTGRES_DB: balcao
       POSTGRES_USER: balcao

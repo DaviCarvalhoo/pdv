@@ -6,10 +6,14 @@
  * Autoria: BPDV-7F3A-DC26
  */
 
-import { NavLink, Navigate, Route, Routes, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import AutorizacaoGerente from './components/AutorizacaoGerente';
+import BloqueioTela from './components/BloqueioTela';
+import EscolherTerminal from './components/EscolherTerminal';
+import ErroTela from './components/ErroTela';
 import Marca from './components/Marca';
-import type { Papel } from './lib/api';
+import { api, type Papel } from './lib/api';
 import { CaixaProvider, useAtalhos, useCaixa, useSessao } from './lib/contexto';
 import { iniciais, moeda, nomePapel } from './lib/format';
 import PaginaCaixa from './pages/Caixa';
@@ -62,10 +66,12 @@ const GRUPOS: { titulo: string; itens: ItemMenu[] }[] = [
 ];
 
 export default function App() {
-  const { sessao } = useSessao();
+  const { sessao, terminal } = useSessao();
   if (!sessao) return <Login />;
+  // Primeiro acesso deste computador: escolher qual caixa ele é.
+  if (!terminal) return <EscolherTerminal />;
   return (
-    <CaixaProvider key={sessao.token}>
+    <CaixaProvider key={sessao.token + JSON.stringify(terminal)}>
       <Estrutura />
       <AutorizacaoGerente />
     </CaixaProvider>
@@ -74,8 +80,15 @@ export default function App() {
 
 function Estrutura() {
   const navegar = useNavigate();
-  const { operador, pode, sair } = useSessao();
+  const { operador, pode, sair, terminal, online } = useSessao();
   const { caixa, carregando } = useCaixa();
+  const local = useLocation();
+  const [minutosBloqueio, setMinutosBloqueio] = useState(0);
+  const retaguarda = !!terminal && 'retaguarda' in terminal;
+
+  useEffect(() => {
+    api.loja().then((l) => setMinutosBloqueio(l.bloqueioInatividadeMin ?? 0)).catch(() => undefined);
+  }, []);
 
   const visiveis = GRUPOS.map((g) => ({ ...g, itens: g.itens.filter((i) => pode(i.papel)) })).filter((g) => g.itens.length);
   const planos = visiveis.flatMap((g) => g.itens);
@@ -110,16 +123,21 @@ function Estrutura() {
         <div className="lateral__rodape">
           <NavLink to="/caixa" className={`status-caixa ${caixa ? 'status-caixa--aberto' : ''} ${caixa?.alertaSangriaLimite ? 'status-caixa--alerta' : ''}`}>
             <span className="status-caixa__luz" aria-hidden />
-            {carregando ? (
+            {retaguarda ? (
+              <span>
+                <strong>Retaguarda</strong>
+                <small>Este computador não vende</small>
+              </span>
+            ) : carregando ? (
               <span>…</span>
             ) : caixa ? (
               <span>
-                <strong>Caixa #{caixa.id}</strong>
+                <strong>{caixa.terminalNome} · aberto</strong>
                 <small>{caixa.alertaSangriaLimite ? 'Gaveta cheia: faça sangria' : `Gaveta ${moeda(caixa.saldoEsperado)}`}</small>
               </span>
             ) : (
               <span>
-                <strong>Caixa fechado</strong>
+                <strong>{terminal && 'nome' in terminal ? terminal.nome : 'Caixa'} · fechado</strong>
                 <small>Abrir caixa →</small>
               </span>
             )}
@@ -143,6 +161,13 @@ function Estrutura() {
       </aside>
 
       <main className="conteudo">
+        {!online && (
+          <div className="sem-conexao" role="alert">
+            <strong>Sem conexão com o servidor.</strong> Tentando reconectar… Nada do que já foi salvo se perde; a operação que
+            falhou precisa ser repetida quando a conexão voltar.
+          </div>
+        )}
+        <ErroTela chave={local.pathname}>
         <Routes>
           <Route path="/" element={<Navigate to={pode('GERENTE') ? '/painel' : '/pdv'} replace />} />
           <Route path="/pdv" element={<PaginaPdv />} />
@@ -158,7 +183,9 @@ function Estrutura() {
           {pode('ADMIN') && <Route path="/usuarios" element={<PaginaUsuarios />} />}
           <Route path="*" element={<Navigate to="/pdv" replace />} />
         </Routes>
+        </ErroTela>
       </main>
+      <BloqueioTela minutos={minutosBloqueio} />
     </div>
   );
 }

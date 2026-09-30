@@ -74,6 +74,7 @@ public class DadosDemonstracao implements ApplicationRunner {
     private final CaixaService caixaService;
     private final VendaService vendaService;
     private final RelogioAjustavel relogio;
+    private final br.com.balcao.pdv.caixa.TerminalRepository terminalRepository;
     private final br.com.balcao.pdv.estoque.EstoqueService estoqueService;
 
     private final Random aleatorio = new Random(42);
@@ -109,7 +110,9 @@ public class DadosDemonstracao implements ApplicationRunner {
         lojaService.atualizar(new LojaService.LojaRequest("Mercadinho Exemplo", "Do bairro, pro bairro", logo,
                 "#D9482B", "Obrigado pela preferência! Volte sempre.", PoliticaSaldoInsuficiente.PERMITIR_E_AVISAR,
                 new BigDecimal("600.00"), new BigDecimal("5"), "2", 4, TipoValorBalanca.PRECO,
-                "pix@mercadinhoexemplo.com.br", "Mercadinho Exemplo", "Sao Paulo", new BigDecimal("31.45")));
+                "pix@mercadinhoexemplo.com.br", "Mercadinho Exemplo", "Sao Paulo", new BigDecimal("31.45"), 10));
+        // Um segundo ponto de venda (balcão externo) para mostrar vários caixas ao mesmo tempo.
+        terminalRepository.save(new br.com.balcao.pdv.caixa.Terminal("Caixa 02"));
         configuracaoFiscalService.atualizar(new ConfiguracaoFiscalDto.Request(
                 "11222333000181", "111111111111", "MERCADINHO EXEMPLO LTDA", "Mercadinho Exemplo", 1,
                 "Rua das Flores", "100", "Centro", "3550308", "São Paulo", "SP", "01001000", "1130000000",

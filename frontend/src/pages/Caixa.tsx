@@ -7,10 +7,11 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import EscolherTerminal from '../components/EscolherTerminal';
 import ExtratoCaixa from '../components/ExtratoCaixa';
 import Painel from '../components/Painel';
-import { api, type Caixa, type Extrato } from '../lib/api';
-import { useAvisos, useCaixa } from '../lib/contexto';
+import { api, type Caixa, type Extrato, type Terminal } from '../lib/api';
+import { useAvisos, useCaixa, useSessao } from '../lib/contexto';
 import { dataHora, moeda, parseValor } from '../lib/format';
 
 export default function PaginaCaixa() {
@@ -20,6 +21,11 @@ export default function PaginaCaixa() {
   const [fechamento, setFechamento] = useState<Extrato | null>(null);
   const [historico, setHistorico] = useState<Caixa[]>([]);
   const [detalhe, setDetalhe] = useState<Extrato | null>(null);
+  const [terminais, setTerminais] = useState<Terminal[]>([]);
+  const [trocando, setTrocando] = useState(false);
+  const { terminal, pode } = useSessao();
+  const retaguarda = !!terminal && 'retaguarda' in terminal;
+  const nomeTerminal = terminal && 'nome' in terminal ? terminal.nome : 'Retaguarda';
 
   const carregarExtrato = useCallback(() => {
     if (caixa) api.extrato(caixa.id).then(setExtrato).catch(erro);
@@ -28,7 +34,10 @@ export default function PaginaCaixa() {
   useEffect(carregarExtrato, [carregarExtrato]);
   useEffect(() => {
     api.caixas().then((p) => setHistorico(p.content)).catch(() => undefined);
+    api.terminais().then(setTerminais).catch(() => undefined);
   }, [caixa, fechamento]);
+
+  if (trocando) return <EscolherTerminal aoCancelar={() => setTrocando(false)} />;
 
   const aposMovimento = async () => {
     await recarregar();
@@ -39,8 +48,15 @@ export default function PaginaCaixa() {
     <div className="pagina">
       <header className="pagina__topo">
         <div>
-          <p className="sobretitulo">Caixa</p>
-          <h1>{caixa ? `Caixa #${caixa.id}` : 'Caixa fechado'}</h1>
+          <p className="sobretitulo">
+            Este computador: {nomeTerminal}
+            {pode('GERENTE') && (
+              <button className="link link--pequeno" onClick={() => setTrocando(true)}>
+                trocar
+              </button>
+            )}
+          </p>
+          <h1>{retaguarda ? 'Caixas da loja' : caixa ? `${caixa.terminalNome} · aberto` : `${nomeTerminal} · fechado`}</h1>
         </div>
         {caixa && (
           <div className="gaveta">
@@ -60,7 +76,31 @@ export default function PaginaCaixa() {
         </section>
       )}
 
-      {!caixa && !fechamento && <Abertura aoAbrir={recarregar} />}
+      {retaguarda && (
+        <p className="faixa">
+          Este computador está como <strong>retaguarda</strong>: acompanha os caixas, mas não vende nem abre gaveta. Para vender
+          aqui, clique em “trocar” e escolha um caixa.
+        </p>
+      )}
+
+      {!retaguarda && !caixa && !fechamento && <Abertura aoAbrir={recarregar} nome={nomeTerminal} />}
+
+      {terminais.filter((t) => t.ativo).length > 1 || retaguarda ? (
+        <section className="bloco">
+          <h2>Caixas da loja agora</h2>
+          <ul className="caixas-loja">
+            {terminais
+              .filter((t) => t.ativo)
+              .map((t) => (
+                <li key={t.id} className={t.caixaId ? 'caixas-loja__aberto' : ''}>
+                  <strong>{t.nome}</strong>
+                  <span>{t.caixaId ? `aberto desde ${dataHora(t.abertoEm)}` : 'fechado'}</span>
+                  {t.caixaId && <em>{moeda(t.gaveta)} na gaveta</em>}
+                </li>
+              ))}
+          </ul>
+        </section>
+      ) : null}
 
       {caixa && (
         <div className="grade-caixa">
@@ -117,6 +157,7 @@ export default function PaginaCaixa() {
             <thead>
               <tr>
                 <th>#</th>
+                <th>Caixa</th>
                 <th>Abertura</th>
                 <th>Fechamento</th>
                 <th className="tabela__num">Esperado</th>
@@ -128,6 +169,7 @@ export default function PaginaCaixa() {
               {historico.map((c) => (
                 <tr key={c.id} className="tabela__clicavel" onClick={() => api.extrato(c.id).then(setDetalhe).catch(erro)}>
                   <td>{c.id}</td>
+                  <td>{c.terminalNome}</td>
                   <td>{dataHora(c.dataAbertura)}</td>
                   <td>{c.dataFechamento ? dataHora(c.dataFechamento) : <span className="selo selo--ok">aberto</span>}</td>
                   <td className="tabela__num">{moeda(c.saldoEsperado)}</td>
@@ -153,13 +195,13 @@ export default function PaginaCaixa() {
   );
 }
 
-function Abertura({ aoAbrir }: { aoAbrir: () => Promise<void> }) {
+function Abertura({ aoAbrir, nome }: { aoAbrir: () => Promise<void>; nome: string }) {
   const [valor, setValor] = useState('');
   const { avisar, erro } = useAvisos();
   return (
     <section className="abertura">
       <p className="sobretitulo">Começar o dia</p>
-      <h2>Quanto tem na gaveta para troco?</h2>
+      <h2>Abrir o {nome}: quanto tem na gaveta para troco?</h2>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
@@ -167,7 +209,7 @@ function Abertura({ aoAbrir }: { aoAbrir: () => Promise<void> }) {
           if (!Number.isFinite(v) || v < 0) return avisar('Informe um valor válido, como 150,00.', 'erro');
           try {
             const c = await api.abrirCaixa(v);
-            avisar(`Caixa #${c.id} aberto com ${moeda(c.saldoInicial)}. Bom trabalho!`);
+            avisar(`${c.terminalNome} aberto com ${moeda(c.saldoInicial)}. Bom trabalho!`);
             await aoAbrir();
           } catch (err) {
             erro(err);

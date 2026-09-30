@@ -5,6 +5,8 @@
 # Autoria: BPDV-7F3A-DC26
 server:
   port: 8080
+  # Termina as requisições em andamento (ex.: finalização de venda) antes de desligar.
+  shutdown: graceful
 
 spring:
   application:
@@ -22,6 +24,12 @@ spring:
         jdbc.time_zone: UTC
   flyway:
     enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+  web:
+    resources:
+      # Em produção o backend também serve a tela (frontend/dist): um endereço só para todos os caixas.
+      static-locations: classpath:/static/, file:${BALCAO_FRONTEND:../frontend/dist}/
   jackson:
     default-property-inclusion: non_null
     serialization:

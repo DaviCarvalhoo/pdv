@@ -42,41 +42,86 @@ public class CaixaService {
     private final CaixaRepository repository;
     private final MovimentacaoCaixaRepository movimentacaoRepository;
     private final VendaRepository vendaRepository;
+    private final TerminalRepository terminais;
     private final Clock relogio;
+
+    /**
+     * Terminal da requisição (cabeçalho {@code X-Terminal}). Sem terminal informado, usa o primeiro ativo:
+     * loja de um caixa só nem precisa configurar nada.
+     */
+    @Transactional(readOnly = true)
+    public Terminal terminal(Long terminalId) {
+        if (terminalId == null) {
+            return terminais.findFirstByAtivoTrueOrderByIdAsc().orElseThrow(() ->
+                    new RegraNegocioException("SEM_TERMINAL", "Cadastre um caixa (terminal) em Loja > Caixas."));
+        }
+        Terminal t = terminais.findById(terminalId).orElseThrow(() -> new NaoEncontradoException("Terminal", terminalId));
+        if (!t.isAtivo()) {
+            throw new RegraNegocioException("TERMINAL_INATIVO",
+                    t.getNome() + " foi desativado. Escolha outro caixa para este computador.");
+        }
+        return t;
+    }
 
     @Transactional
     public Caixa abrir(BigDecimal saldoInicial) {
-        return abrir(saldoInicial, null);
+        return abrir(saldoInicial, null, null);
     }
 
     @Transactional
     public Caixa abrir(BigDecimal saldoInicial, Long operadorId) {
+        return abrir(saldoInicial, operadorId, null);
+    }
+
+    @Transactional
+    public Caixa abrir(BigDecimal saldoInicial, Long operadorId, Long terminalId) {
         if (saldoInicial == null || saldoInicial.signum() < 0) {
             throw new RegraNegocioException("SALDO_INICIAL_INVALIDO", "O saldo inicial não pode ser negativo.");
         }
-        repository.findFirstByStatus(StatusCaixa.ABERTO).ifPresent(c -> {
-            throw new ConflitoException("CAIXA_JA_ABERTO", "Já existe um caixa aberto (#" + c.getId() + ").",
+        Terminal terminal = terminal(terminalId);
+        repository.findFirstByStatusAndTerminalId(StatusCaixa.ABERTO, terminal.getId()).ifPresent(c -> {
+            throw new ConflitoException("CAIXA_JA_ABERTO", terminal.getNome() + " já está aberto (#" + c.getId() + ").",
                     Map.of("caixaId", c.getId()));
         });
         try {
-            Caixa caixa = repository.saveAndFlush(new Caixa(Dinheiro.valor(saldoInicial), agora(), operadorId));
-            log.info("Caixa #{} aberto com saldo inicial {}", caixa.getId(), caixa.getSaldoInicial());
+            terminal.setUltimoUso(agora());
+            Caixa caixa = repository.saveAndFlush(new Caixa(terminal, Dinheiro.valor(saldoInicial), agora(), operadorId));
+            log.info("Caixa #{} ({}) aberto com saldo inicial {}", caixa.getId(), terminal.getNome(),
+                    caixa.getSaldoInicial());
             return caixa;
         } catch (DataIntegrityViolationException e) {
-            // Índice único parcial: outra requisição abriu um caixa ao mesmo tempo.
-            throw new ConflitoException("CAIXA_JA_ABERTO", "Já existe um caixa aberto.");
+            // Índice único parcial: outra requisição abriu este terminal ao mesmo tempo.
+            throw new ConflitoException("CAIXA_JA_ABERTO", terminal.getNome() + " já está aberto.");
         }
     }
 
     @Transactional(readOnly = true)
     public Optional<Caixa> aberto() {
-        return repository.findFirstByStatus(StatusCaixa.ABERTO);
+        return aberto(null);
+    }
+
+    /** Caixa aberto no terminal informado (ou no terminal padrão). */
+    @Transactional(readOnly = true)
+    public Optional<Caixa> aberto(Long terminalId) {
+        return repository.findFirstByStatusAndTerminalId(StatusCaixa.ABERTO, terminal(terminalId).getId());
+    }
+
+    /** Todos os caixas abertos da loja, um por terminal. */
+    @Transactional(readOnly = true)
+    public List<Caixa> abertos() {
+        return repository.findByStatusOrderByTerminalNome(StatusCaixa.ABERTO);
     }
 
     @Transactional(readOnly = true)
     public Caixa exigirAberto() {
-        return aberto().orElseThrow(() ->
-                new RegraNegocioException("CAIXA_NAO_ABERTO", "Nenhum caixa aberto. Abra o caixa primeiro."));
+        return exigirAberto(null);
+    }
+
+    @Transactional(readOnly = true)
+    public Caixa exigirAberto(Long terminalId) {
+        Terminal t = terminal(terminalId);
+        return repository.findFirstByStatusAndTerminalId(StatusCaixa.ABERTO, t.getId()).orElseThrow(() ->
+                new RegraNegocioException("CAIXA_NAO_ABERTO", t.getNome() + " está fechado. Abra o caixa primeiro."));
     }
 
     @Transactional(readOnly = true)

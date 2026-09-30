@@ -63,6 +63,13 @@ public class TrocaService {
     @Transactional
     public Resultado devolver(Long vendaId, List<ItemDevolvido> itens, Devolucao.Destino destino, String motivo,
                               Long operadorId) {
+        return devolver(vendaId, itens, destino, motivo, operadorId, null);
+    }
+
+    /** Devolução em dinheiro sai da gaveta do terminal que está atendendo. */
+    @Transactional
+    public Resultado devolver(Long vendaId, List<ItemDevolvido> itens, Devolucao.Destino destino, String motivo,
+                              Long operadorId, Long terminalId) {
         Venda venda = vendaRepository.findById(vendaId).orElseThrow(() -> new NaoEncontradoException("Venda", vendaId));
         if (venda.getStatus() != StatusVenda.FINALIZADA) {
             throw new RegraNegocioException("VENDA_NAO_FINALIZADA", "Só vendas finalizadas aceitam troca ou devolução.");
@@ -100,7 +107,7 @@ public class TrocaService {
 
         ValeTroca vale = null;
         if (destino == Devolucao.Destino.DINHEIRO) {
-            Caixa caixa = caixaService.travar(caixaService.exigirAberto().getId());
+            Caixa caixa = caixaService.travar(caixaService.exigirAberto(terminalId).getId());
             caixaService.registrarDevolucao(caixa, valor, vendaId, operadorId);
         } else {
             vale = valeRepository.save(new ValeTroca(novoCodigo(), valor, vendaId,

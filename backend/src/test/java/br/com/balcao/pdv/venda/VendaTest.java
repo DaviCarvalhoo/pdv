@@ -32,7 +32,7 @@ class VendaTest {
 
     @BeforeEach
     void setUp() {
-        venda = new Venda(new Caixa(new BigDecimal("100.00"), AGORA), AGORA);
+        venda = new Venda(new Caixa(new br.com.balcao.pdv.caixa.Terminal("Caixa 01"), new BigDecimal("100.00"), AGORA, null), AGORA);
         refri = produto(1L, "Refrigerante", "9.50", "UN");
         pao = produto(2L, "Pão (kg)", "16.90", "KG");
     }

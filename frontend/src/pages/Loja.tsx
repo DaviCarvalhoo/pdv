@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import CadastroTerminais from '../components/CadastroTerminais';
 import { api, type Loja } from '../lib/api';
 import { useAvisos, useSessao } from '../lib/contexto';
 import { campoNumero, iniciais, moeda, parseValor } from '../lib/format';
@@ -31,6 +32,7 @@ export default function PaginaLoja() {
           descontoMaxOperador: campoNumero(l.descontoMaxOperador),
           aliquotaTributos: campoNumero(l.aliquotaTributos),
           balancaDigitosCodigo: String(l.balancaDigitosCodigo),
+          bloqueioInatividadeMin: String(l.bloqueioInatividadeMin ?? 10),
         } as unknown as Record<string, string>);
       })
       .catch(erro);
@@ -62,6 +64,7 @@ export default function PaginaLoja() {
         descontoMaxOperador: n('descontoMaxOperador') ?? 0,
         aliquotaTributos: n('aliquotaTributos') ?? undefined,
         balancaDigitosCodigo: Number(f.balancaDigitosCodigo),
+        bloqueioInatividadeMin: Number(f.bloqueioInatividadeMin || 0),
       });
       setLoja(l);
       await recarregarLoja();
@@ -149,11 +152,17 @@ export default function PaginaLoja() {
                 <input inputMode="decimal" placeholder="sem aviso" {...texto('limiteGaveta')} />
               </label>
               <label>
+                Travar a tela após (min) <small>0 desliga · pede o PIN para voltar</small>
+                <input inputMode="numeric" {...texto('bloqueioInatividadeMin')} />
+              </label>
+              <label>
                 Tributos aproximados (%) <small>Lei 12.741 · IBPT</small>
                 <input inputMode="decimal" placeholder="ex.: 31,45" {...texto('aliquotaTributos')} />
               </label>
             </div>
           </section>
+
+          <CadastroTerminais />
 
           <section className="secao-form">
             <h2>PIX</h2>

@@ -76,7 +76,12 @@ public class VendaService {
 
     @Transactional
     public VendaResponse iniciar(Long operadorId) {
-        Caixa caixa = caixaService.exigirAberto();
+        return iniciar(operadorId, null);
+    }
+
+    @Transactional
+    public VendaResponse iniciar(Long operadorId, Long terminalId) {
+        Caixa caixa = caixaService.exigirAberto(terminalId);
         repository.findFirstByCaixaIdAndStatusAndEmEsperaFalseOrderByIdDesc(caixa.getId(), StatusVenda.ABERTA)
                 .ifPresent(v -> {
                     throw new ConflitoException("VENDA_EM_ANDAMENTO",
@@ -88,7 +93,12 @@ public class VendaService {
 
     @Transactional(readOnly = true)
     public Optional<VendaResponse> emAndamento() {
-        return caixaService.aberto()
+        return emAndamento(null);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<VendaResponse> emAndamento(Long terminalId) {
+        return caixaService.aberto(terminalId)
                 .flatMap(c -> repository.findFirstByCaixaIdAndStatusAndEmEsperaFalseOrderByIdDesc(c.getId(),
                         StatusVenda.ABERTA))
                 .map(this::resposta);
@@ -96,7 +106,12 @@ public class VendaService {
 
     @Transactional(readOnly = true)
     public List<VendaResumo> emEspera() {
-        return caixaService.aberto()
+        return emEspera(null);
+    }
+
+    @Transactional(readOnly = true)
+    public List<VendaResumo> emEspera(Long terminalId) {
+        return caixaService.aberto(terminalId)
                 .map(c -> repository.findByCaixaIdAndStatusAndEmEsperaTrueOrderByIdAsc(c.getId(), StatusVenda.ABERTA)
                         .stream().map(VendaResumo::de).toList())
                 .orElse(List.of());

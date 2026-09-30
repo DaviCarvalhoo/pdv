@@ -15,6 +15,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
+import org.springframework.web.servlet.config.annotation.ViewControllerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
@@ -30,6 +31,18 @@ public class WebConfig implements WebMvcConfigurer {
     @Override
     public void addCorsMappings(CorsRegistry registry) {
         registry.addMapping("/api/**").allowedOrigins(origens).allowedMethods("*");
+    }
+
+    /**
+     * Com o frontend compilado servido pelo próprio backend, as rotas da tela (/pdv, /caixa...) devolvem o
+     * index.html: o React assume a navegação. Assim, qualquer caixa da rede usa http://servidor:8080.
+     */
+    @Override
+    public void addViewControllers(ViewControllerRegistry registry) {
+        for (String rota : new String[]{"/", "/pdv", "/caixa", "/clientes", "/vendas", "/produtos", "/fiscal",
+                "/painel", "/entrada-nfe", "/relatorios", "/loja", "/usuarios"}) {
+            registry.addViewController(rota).setViewName("forward:/index.html");
+        }
     }
 
     @Override

@@ -49,16 +49,22 @@ public class CaixaController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public CaixaResponse abrir(@Valid @RequestBody AberturaRequest req) {
-        Caixa caixa = service.abrir(req.saldoInicial(), contexto.operadorId());
+        Caixa caixa = service.abrir(req.saldoInicial(), contexto.operadorId(), contexto.terminalId());
         return resposta(caixa);
     }
 
     /** 200 com o caixa aberto ou 204 quando não há caixa aberto. */
     @GetMapping("/aberto")
     public ResponseEntity<CaixaResponse> aberto() {
-        return service.aberto()
+        return service.aberto(contexto.terminalId())
                 .map(c -> ResponseEntity.ok(resposta(c)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
+    }
+
+    /** Situação de todos os caixas abertos da loja (visão do gerente). */
+    @GetMapping("/abertos")
+    public List<CaixaResponse> abertos() {
+        return service.abertos().stream().map(this::resposta).toList();
     }
 
     @GetMapping

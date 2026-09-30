@@ -154,6 +154,16 @@ export default function PaginaPainel() {
               )}
             </section>
 
+            {painel.porCaixa.length > 1 && (
+              <section className="bloco-painel">
+                <header>
+                  <h2>Por caixa</h2>
+                  <span className="dica">{painel.alertas.caixasAbertos} abertos agora</span>
+                </header>
+                <Barras itens={painel.porCaixa.map((s) => ({ rotulo: `${s.rotulo} (${s.quantidade})`, valor: s.valor }))} />
+              </section>
+            )}
+
             <section className="bloco-painel">
               <header>
                 <h2>Por operador</h2>
@@ -191,8 +201,12 @@ function notaLucro(r: Resumo) {
 function Alertas({ painel }: { painel: Painel }) {
   const a = painel.alertas;
   const itens: { texto: string; link: string; tipo: 'alerta' | 'info' }[] = [];
-  if (a.gaveta != null && a.limiteGaveta != null && a.gaveta > a.limiteGaveta)
-    itens.push({ texto: `Gaveta com ${moeda(a.gaveta)}: acima do limite, faça sangria`, link: '/caixa', tipo: 'alerta' });
+  if (a.caixasAcimaDoLimite > 0)
+    itens.push({
+      texto: a.caixasAcimaDoLimite === 1 ? 'Um caixa está com a gaveta acima do limite: faça sangria' : `${a.caixasAcimaDoLimite} caixas com a gaveta acima do limite`,
+      link: '/caixa',
+      tipo: 'alerta',
+    });
   const plural = (n: number, um: string, varios: string) => `${n} ${n === 1 ? um : varios}`;
   if (a.estoqueZerado > 0) itens.push({ texto: plural(a.estoqueZerado, 'produto sem estoque', 'produtos sem estoque'), link: '/produtos', tipo: 'alerta' });
   if (a.estoqueBaixo > 0) itens.push({ texto: plural(a.estoqueBaixo, 'produto abaixo do mínimo', 'produtos abaixo do mínimo'), link: '/produtos', tipo: 'info' });
